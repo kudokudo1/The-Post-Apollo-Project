@@ -11,6 +11,9 @@ Scope {
     // Compatibility property name; keys are exact process identities, never PID alone.
     // Only correlated, successfully observed kernel readbacks populate this map.
     property var softLimitPids: ({})
+    // Session-only ownership; original kernel values remain exact decimal strings.
+    // Uncertain entries block further writes until independently reconciled.
+    property var limitOwnership: ({})
     property var queuedRequest: null
     property var activeRequest: null
     property bool applyLoading: false
@@ -34,6 +37,13 @@ Scope {
                 || typeof entry.comm !== "string" || !entry.comm)
             return "";
         return JSON.stringify([entry.pid, entry.startTicks, entry.comm]);
+    }
+
+    function limitStateFor(entry) {
+        const key = identityKey(entry);
+        const owned = key ? limitOwnership[key] : null;
+        return !key || (owned && owned.uncertain) ? "unknown"
+            : owned ? "managed" : "unmanaged";
     }
 
     function limitBytesFor(entry) {
@@ -101,6 +111,10 @@ Scope {
             applyError = "INVALID PROCESS IDENTITY OR LIMIT";
             return false;
         }
+        if (limitStateFor(entry) === "unknown") {
+            applyError = "LIMIT OWNERSHIP UNKNOWN // VERIFY BEFORE CHANGING";
+            return false;
+        }
         // One active and one queued request. Never silently overwrite an
         // accepted request, even if the next target shares a numeric PID.
         if (queuedRequest) {
@@ -134,15 +148,24 @@ Scope {
     }
 
     function applyCommand(request) {
-        const script = "import json, os, resource, select, sys\nreq=json.loads(sys.argv[1])\npid=req['pid']; born=req['startTicks']; name=req['name']; requested=req['capBytes']\nreply=dict(serial=req['serial'],pid=pid,startTicks=born,name=name,requested=requested,ok=False)\nfd=None\nattempted=False\ndef observe():\n    if poll.poll(0): raise RuntimeError('ORIGINAL PROCESS EXITED')\n    with open(f'/proc/{pid}/stat',encoding='utf-8') as source: data=source.read().strip()\n    end=data.rfind(')'); fields=data[end+2:].split()\n    if data[data.index('(')+1:end]!=name or int(fields[19])!=born or fields[0]=='Z':\n        raise RuntimeError('PROCESS IDENTITY CHANGED')\n    if poll.poll(0): raise RuntimeError('ORIGINAL PROCESS EXITED')\ntry:\n    if type(pid) is not int or pid<=1 or type(born) is not int or born<=0 or not isinstance(name,str) or not name or type(requested) is not int or requested<0:\n        raise ValueError('INVALID LIMIT REQUEST')\n    fd=os.pidfd_open(pid,0)\n    poll=select.poll(); poll.register(fd,select.POLLIN)\n    observe()\n    old_soft,hard=resource.prlimit(pid,resource.RLIMIT_AS)\n    target=hard if requested==0 else (requested if hard==resource.RLIM_INFINITY else min(requested,hard))\n    observe()\n    # prlimit has no pidfd variant. These checks narrow, not eliminate,\n    # the numeric-PID race. Never retry or assume success on ambiguity.\n    attempted=True\n    resource.prlimit(pid,resource.RLIMIT_AS,(target,hard))\n    observe()\n    soft,hard2=resource.prlimit(pid,resource.RLIMIT_AS)\n    observe()\n    if soft!=target or hard2!=hard: raise RuntimeError('LIMIT READBACK MISMATCH')\n    reply.update(ok=True,soft=-1 if soft==resource.RLIM_INFINITY else soft)\nexcept Exception as exc:\n    reply.update(error=str(exc),attempted=attempted)\nfinally:\n    if fd is not None: os.close(fd)\nprint(json.dumps(reply))\n";
+        const script = "import json, os, resource, select, sys\nreq=json.loads(sys.argv[1])\npid=req['pid']; born=req['startTicks']; name=req['name']; requested=req['capBytes']\nreply=dict(serial=req['serial'],pid=pid,startTicks=born,name=name,requested=requested,ok=False)\nfd=None\nattempted=False\nconflict=False\ndef encode(value):\n    return '-1' if value==resource.RLIM_INFINITY else str(value)\ndef decode(value):\n    if not isinstance(value,str) or (value!='-1' and (not value.isascii() or not value.isdecimal())):\n        raise ValueError('INVALID LIMIT BASELINE')\n    return resource.RLIM_INFINITY if value=='-1' else int(value)\ndef observe():\n    if poll.poll(0): raise RuntimeError('ORIGINAL PROCESS EXITED')\n    with open(f'/proc/{pid}/stat',encoding='utf-8') as source: data=source.read().strip()\n    end=data.rfind(')'); fields=data[end+2:].split()\n    if data[data.index('(')+1:end]!=name or int(fields[19])!=born or fields[0]=='Z':\n        raise RuntimeError('PROCESS IDENTITY CHANGED')\n    if poll.poll(0): raise RuntimeError('ORIGINAL PROCESS EXITED')\ntry:\n    if type(pid) is not int or pid<=1 or type(born) is not int or born<=0 or not isinstance(name,str) or not name or type(requested) is not int or requested<0:\n        raise ValueError('INVALID LIMIT REQUEST')\n    owned=req.get('ownership')\n    if owned is not None and (not isinstance(owned,dict) or owned.get('uncertain')):\n        raise ValueError('LIMIT OWNERSHIP UNKNOWN')\n    fd=os.pidfd_open(pid,0)\n    poll=select.poll(); poll.register(fd,select.POLLIN)\n    observe()\n    old_soft,hard=resource.prlimit(pid,resource.RLIMIT_AS)\n    observe()\n    original=encode(old_soft)\n    hard_token=encode(hard)\n    if owned is not None:\n        original=owned['originalSoft']\n        baseline=decode(original)\n        if encode(old_soft)!=owned['appliedSoft'] or hard_token!=owned['hard']:\n            conflict=True\n            raise RuntimeError('EXTERNAL LIMIT CHANGE // NO MUTATION')\n    if requested==0 and owned is None:\n        # Release is a no-op if KILL does not own a previous adjustment.\n        reply.update(ok=True,mode='noop',observedSoft=encode(old_soft),originalSoft=original,hard=hard_token)\n    else:\n        if requested==0:\n            target=baseline\n            if hard!=resource.RLIM_INFINITY and (target==resource.RLIM_INFINITY or target>hard):\n                conflict=True\n                raise RuntimeError('ORIGINAL SOFT LIMIT NO LONGER PERMITTED')\n        else:\n            target=requested if hard==resource.RLIM_INFINITY else min(requested,hard)\n        observe()\n        # Compare once more immediately before the numeric-PID syscall.\n        # This is not atomic; do not retry or claim race-free mutation.\n        if resource.prlimit(pid,resource.RLIMIT_AS)!=(old_soft,hard):\n            conflict=True\n            raise RuntimeError('LIMIT CHANGED BEFORE APPLY // NO MUTATION')\n        observe()\n        if target!=old_soft:\n            attempted=True\n            resource.prlimit(pid,resource.RLIMIT_AS,(target,hard))\n        observe()\n        soft,hard2=resource.prlimit(pid,resource.RLIMIT_AS)\n        observe()\n        if soft!=target or hard2!=hard:\n            conflict=True\n            raise RuntimeError('LIMIT READBACK MISMATCH')\n        mode='released' if requested==0 else ('noop' if owned is None and soft==old_soft else 'managed')\n        reply.update(ok=True,mode=mode,observedSoft=encode(soft),originalSoft=original,hard=hard_token)\nexcept Exception as exc:\n    reply.update(error=str(exc),attempted=attempted,conflict=conflict)\nfinally:\n    if fd is not None: os.close(fd)\nprint(json.dumps(reply))\n";
         return ["/usr/bin/python3", "-c", script, JSON.stringify(request)];
     }
 
     function startQueuedApply() {
         if (applyLoading || !queuedRequest)
             return;
-        activeRequest = queuedRequest;
+        const request = queuedRequest;
         queuedRequest = null;
+        const ownership = limitOwnership[request.key] || null;
+        // Bind the last verified state at dispatch, not while a prior request
+        // for the same process may still be in flight.
+        if (ownership && ownership.uncertain) {
+            applyError = "LIMIT OWNERSHIP UNKNOWN // QUEUED REQUEST REFUSED";
+            refreshRequested();
+            return;
+        }
+        activeRequest = Object.assign({},request,{ownership:ownership ? Object.assign({},ownership) : null});
         applyLoading = true;
         applyError = "";
         helperExited = false;
@@ -157,6 +180,10 @@ Scope {
         applyProcess.exec(applyCommand(activeRequest));
     }
 
+    function validLimitToken(value) {
+        return typeof value === "string" && /^(-1|0|[1-9][0-9]*)$/.test(value);
+    }
+
     function validatedReply(request, output, errors, code, status, timedOut) {
         if (!request || timedOut || code !== 0 || status !== 0 || errors.trim())
             return null;
@@ -166,10 +193,27 @@ Scope {
                     || reply.startTicks !== request.startTicks || reply.name !== request.name
                     || reply.requested !== request.capBytes || typeof reply.ok !== "boolean")
                 return null;
-            if (reply.ok && (!Number.isSafeInteger(reply.soft) || reply.soft < -1))
+            if (reply.ok) {
+                if (["managed","released","noop"].indexOf(reply.mode) < 0
+                        || !validLimitToken(reply.observedSoft) || !validLimitToken(reply.originalSoft)
+                        || !validLimitToken(reply.hard))
+                    return null;
+                const owned = request.ownership;
+                if (owned && (reply.originalSoft !== owned.originalSoft || reply.hard !== owned.hard))
+                    return null;
+                if (reply.mode === "managed" && (request.capBytes <= 0
+                        || !Number.isSafeInteger(Number(reply.observedSoft))
+                        || Number(reply.observedSoft) < 0 || Number(reply.observedSoft) > request.capBytes))
+                    return null;
+                if (reply.mode === "released" && (!owned || request.capBytes !== 0
+                        || reply.observedSoft !== owned.originalSoft))
+                    return null;
+                if (reply.mode === "noop" && (owned || reply.observedSoft !== reply.originalSoft))
+                    return null;
+            } else if (typeof reply.error !== "string" || typeof reply.attempted !== "boolean"
+                       || typeof reply.conflict !== "boolean") {
                 return null;
-            if (!reply.ok && (typeof reply.error !== "string" || typeof reply.attempted !== "boolean"))
-                return null;
+            }
             return reply;
         } catch (error) {
             return null;
@@ -178,23 +222,31 @@ Scope {
 
     function consumeApply(request, reply) {
         if (!request) return;
-        const next = Object.assign({}, softLimitPids);
+        const next = Object.assign({},softLimitPids);
+        const ownership = Object.assign({},limitOwnership);
         if (reply && reply.ok) {
-            if (reply.soft === -1)
+            if (reply.mode === "managed") {
+                next[request.key] = Number(reply.observedSoft);
+                ownership[request.key] = {originalSoft:reply.originalSoft,
+                    hard:reply.hard,appliedSoft:reply.observedSoft,uncertain:false};
+            } else {
                 delete next[request.key];
-            else
-                next[request.key] = reply.soft;
+                delete ownership[request.key];
+            }
             applyError = "";
-        } else if (reply && !reply.attempted) {
-            // No mutation attempted. Keep only the previous observed value.
+        } else if (reply && !reply.attempted && !reply.conflict) {
             applyError = "LIMIT REFUSED // " + reply.error;
         } else {
-            // A helper failure after possible mutation is not a rollback.
-            // Forget the unverified value; never transfer it to another PID birth.
+            // Retain any known baseline for diagnosis, but quarantine writes.
+            // Unknown first mutation cannot silently establish a new baseline.
             delete next[request.key];
-            applyError = "LIMIT OUTCOME UNKNOWN // VERIFY PROCESS STATE";
+            ownership[request.key] = Object.assign({},request.ownership || {},{uncertain:true});
+            applyError = reply && reply.conflict
+                ? "EXTERNAL OR UNVERIFIED LIMIT CHANGE // VERIFY PROCESS STATE"
+                : "LIMIT OUTCOME UNKNOWN // VERIFY PROCESS STATE";
         }
         softLimitPids = next;
+        limitOwnership = ownership;
     }
 
     function maybeFinishApply() {

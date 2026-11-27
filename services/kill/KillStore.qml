@@ -38,10 +38,27 @@ Scope {
     readonly property var safety: safetyState
     readonly property var control: controlBackend
     readonly property var limits: limitBackend
-    // One long-lived executor; existing donor Hunter controller still admits
-    // and sequences exact reviewed targets during the transition.
+    // One long-lived execution lifecycle. Transitional donor supplies
+    // candidate policy and legacy confirmation presentation, not execution state.
+    property var donorHunterHost: null
+    property var donorHunterFavorites: null
     readonly property var hunterExecutor: hunterExecution
-    HunterExecutor { id: hunterExecution }
+    readonly property var hunterOperation: hunterController
+    HunterOperationController {
+        id: hunterController
+        host: root.donorHunterHost
+        favoriteStoreObject: root.donorHunterFavorites
+        executor: hunterExecution
+        refreshTimer: afterAction
+    }
+    HunterExecutor {
+        id: hunterExecution
+        onResultReady: function(result) { hunterController.applyResult(result); }
+        onFinished: hunterController.finish()
+        onErrorRaised: function(message) {
+            console.log("AppControl: HUNTER", String(message || ""));
+        }
+    }
 
     // Shared individual action authority. Only the transitional legacy
     // confirmation UI selects donorTask and contributes its bulk exclusion.

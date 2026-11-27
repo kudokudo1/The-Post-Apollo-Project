@@ -1,0 +1,46 @@
+name: Forest First Light Stage 1 public staging (NO INFERENCE)
+
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: Exact independently reviewed integrated commit SHA
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forest-first-light-stage1
+  cancel-in-progress: false
+
+jobs:
+  public-artifact-feasibility:
+    if: github.ref == 'refs/heads/main' && github.event.repository.private == false && github.run_attempt == 1 && inputs.reviewed_sha == github.sha
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Offline verifier tests (no downloads)
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/env -i PATH=/usr/bin:/bin LANG=C.UTF-8 /usr/bin/python3 -I -B tests/forest/test_first_light_stage1.py
+      - name: Stage and verify fixed public artifacts (never execute)
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          work="$(mktemp -d "$RUNNER_TEMP/forest-stage1.XXXXXXXX")"
+          trap 'rm -rf -- "$work"' EXIT
+          /usr/bin/env -i PATH=/usr/bin:/bin LANG=C.UTF-8 \
+            RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" RUNNER_ARCH="$RUNNER_ARCH" \
+            ImageOS="$ImageOS" ImageVersion="$ImageVersion" \
+            GITHUB_ACTIONS="$GITHUB_ACTIONS" GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME" \
+            GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" \
+            /usr/bin/timeout --signal=TERM --kill-after=10s 720s \
+            /usr/bin/python3 -I -B tests/forest/first_light_stage1.py "$work" </dev/null

@@ -78,17 +78,18 @@ test("recipient mounts actual donor Hunter controls, all filter rails, search an
     for(const name of ["cpuPlusKillTargetScroll","cpuPlusKillInstrumentViewport","cpuPlusKillActuatorScroll"])
         assert.ok(recipient.includes(name));
     assert.match(recipient,/function killAllEligibleTasks\(\) \{ return bulkCandidates\("kill-all"\); \}/);
-    assert.match(recipient,/appControlWindow\.prepareCpuBulkReview\(kind,hunterMetricMode,hunterVisibilityMode\)/);
-    assert.match(recipient,/appControlWindow\.confirmCpuBulkReview\(bulkReview\)/);
+    assert.match(recipient,/collectionSource\.prepareCpuBulkReview\(kind,hunterMetricMode,hunterVisibilityMode\)/);
+    assert.match(recipient,/collectionSource\.confirmCpuBulkReview\(bulkReview\)/);
     assert.match(recipient,/objectName: "cpuPlusBulkReview"/);
     const owner=read("widgets/AppControlW.qml");
-    assert.match(owner,/cpuBulkReview !== review/);
-    assert.match(owner,/hunterOperationController\.start\(review\.kind, review\.targets, true\)/);
-    assert.match(owner,/hunterHogCandidates\(metric\)/);
-    assert.match(owner,/onCpuPlusProcessVisibleChanged: if \(!cpuPlusProcessVisible\) cancelCpuBulkReview\(cpuBulkReview\)/);
+    const bulkStore=read("services/kill/KillStore.qml");
+    assert.match(bulkStore,/cpuBulkReview !== review/);
+    assert.match(bulkStore,/hunterOperation\.start\(review\.kind, review\.targets, true\)/);
+    assert.match(bulkStore,/hunterHogCandidates\(metric\)/);
+    assert.match(bulkStore,/onCpuVisibleChanged: if \(!cpuVisible\) cancelCpuBulkReview\(cpuBulkReview\)/);
     assert.match(owner,/readonly property var cpuBulkReview: KillBackend\.KillStore\.cpuBulkReview/);
-    assert.match(owner,/KillBackend\.KillStore\.captureCpuBulkReview\(kind, metric, visibility, captures\)/);
-    assert.match(owner,/if \(!KillBackend\.KillStore\.releaseCpuBulkReview\(review\)\) return false;\s*hunterOperationController\.start/);
+    assert.match(bulkStore,/captureCpuBulkReview\(kind, metric, visibility, captures\)/);
+    assert.match(bulkStore,/if \(!releaseCpuBulkReview\(review\)\) return false;\s*hunterOperation\.start/);
 });
 
 test("recipient restores existing owner graph and favorite semantics", () => {
@@ -558,7 +559,7 @@ test("K3a: one shared runtime safety, mutation primitive and limit queue", () =>
     assert.match(store,/controlOwner: root\.control/);
     assert.match(store,/limitsOwner: root\.limits/);
     assert.match(store,/bulkBlocked: root\.donorActionBlocked/);
-    assert.match(owner,/property: "donorActionBlocked"\s*value: appControlWindow.cpuBulkReview !== null/);
+    assert.match(owner,/property: "donorActionBlocked"\s*value: appControlWindow\.destructiveConfirmOpen/);
 });
 
 test("K3b: independent guarded gateway and presentation share service custody", () => {
@@ -572,7 +573,8 @@ test("K3b: independent guarded gateway and presentation share service custody", 
     assert.match(store,/ownerRows: root\.rows/);
     assert.match(store,/presentationOwner: root\.presentation/);
     assert.match(store,/refreshOwner: root\.refreshAfterActionTimer/);
-    assert.match(owner,/property: "donorActionBlocked"\s*value: appControlWindow.cpuBulkReview !== null\s*\|\| appControlWindow.hunterOperationPhase !== "idle"\s*\|\| appControlWindow.destructiveConfirmOpen/);
+    assert.match(owner,/property: "donorActionBlocked"\s*value: appControlWindow\.destructiveConfirmOpen/);
+    assert.match(store,/bulkBlocked: root\.donorActionBlocked \|\| root\.cpuBulkReview !== null\s*\|\| root\.hunterOperation\.phase !== "idle"/);
     assert.match(owner,/function onConfirmationRequested\([\s\S]*?appControlWindow.openDestructiveConfirm\(/);
     assert.match(read("widgets/appcontrol/AppControlHubActionGate.qml"),/KillBackend\.AppControlHubActionGate \{\}/);
 });
@@ -675,8 +677,8 @@ test("K3c.2b-2: one service-owned Hunter lifecycle and executor route results wi
     assert.match(store,/readonly property var favoriteStore: FavoritesStore/);
     assert.match(store,/favoriteStoreObject: root\.favoriteStore/);
     assert.doesNotMatch(owner,/property: "donorHunterFavorites"/);
-    assert.match(controller,/function start\([^\n]+\)\s*\{\s*if \(!host \|\| !favoriteStoreObject\) return;/);
-    assert.match(controller,/if \(!host \|\| !favoriteStoreObject\) \{ stopRemaining\(\); return; \}/);
+    assert.match(controller,/function start\([^\n]+\)\s*\{\s*if \(!policyReady \|\| \(cpuRecipient !== true && !host\)\) return;/);
+    assert.match(controller,/if \(!policyReady\) \{ stopRemaining\(\); return; \}/);
     assert.match(read("widgets/appcontrol/HunterOperationController.qml"),/KillBackend\.HunterOperationController \{\}/);
     assert.doesNotMatch(owner,/property alias hunterOperation/);
 });
@@ -776,5 +778,70 @@ test("K4c: shared HOG and MICE rules retain thresholds and refuse unknown window
     assert.deepEqual(api.hunterHogCandidates(1),[top,above]);
     assert.match(owner,/return KillBackend\.KillStore\.hunterHogCandidates\(/);
     assert.match(owner,/return KillBackend\.KillStore\.hunterMouseCandidates\(\)/);
-    assert.match(owner,/property: "hunterVisibleWindows"\s*value: appControlWindow\.swayWindows/);
+    assert.match(owner,/property: "hunterVisibleWindows"\s*value: appControlWindow\.windowDataReady && !appControlWindow\.windowDataError\s*\? appControlWindow\.swayWindows : null/);
+});
+
+test("K4d: direct service admission consumes only the reviewed targets and preserves exclusion", () => {
+    const store=read("services/kill/KillStore.qml");
+    const recipient=read("widgets/cpuplus/CpuPlusKillWorkspace.qml");
+    const a=store.indexOf("    function cpuBulkCandidates(");
+    const b=store.indexOf("    // One immutable recipient review.",a);
+    const c=store.indexOf("    function captureCpuBulkReview(");
+    const d=store.indexOf("    // K4c:",c);
+    assert.ok(a>=0 && b>a && c>b && d>c);
+    const row={pid:4321,startTicks:98765,name:"synthetic",identity:"synthetic"};
+    let starts=[];
+    const operation={policyReady:true,phase:"idle",recipientOwned:false,
+        targetsFromRows:rs=>rs.map(r=>({...r})),targetIsFavorite:r=>!!r.favorite,
+        start:(kind,targets,owned)=>{starts.push({kind,targets,owned});operation.phase="running";operation.recipientOwned=owned;}};
+    const gate={pending:null,busy:false,bulkBlocked:false};
+    const api=new Function("hunterOperation","actionGate","rows",
+        "let cpuVisible=true,donorActionBlocked=false,cpuBulkReview=null;"+
+        "let hunterOperationPhase='idle',cpuBulkOperation=false;"+
+        "function killAllEligibleTasks(){return rows;} function hunterHogCandidates(){return rows;} function hunterMouseCandidates(){return rows;}"+
+        store.slice(a,b)+store.slice(c,d)+
+        "\nreturn {prepareCpuBulkReview,confirmCpuBulkReview,cancelCpuBulkReview,acknowledgeCpuBulkReport,"+
+        "visible:v=>cpuVisible=v,blocked:v=>donorActionBlocked=v,phase:v=>hunterOperationPhase=v,report:v=>cpuBulkOperation=v};")
+        (operation,gate,[row]);
+    api.visible(false);
+    assert.equal(api.prepareCpuBulkReview("kill-all",0,0),null);
+    api.visible(true);
+    const review=api.prepareCpuBulkReview("kill-all",0,0);
+    assert.ok(review && Object.isFrozen(review.targets));
+    assert.equal(api.confirmCpuBulkReview({...review}),false);
+    api.blocked(true);
+    assert.equal(api.confirmCpuBulkReview(review),false);
+    api.blocked(false);
+    gate.pending={};
+    assert.equal(api.confirmCpuBulkReview(review),false);
+    gate.pending=null;
+    operation.policyReady=false;
+    assert.equal(api.confirmCpuBulkReview(review),false);
+    operation.policyReady=true;
+    assert.equal(api.confirmCpuBulkReview(review),true);
+    assert.equal(api.confirmCpuBulkReview(review),false);
+    assert.equal(starts.length,1);
+    assert.equal(starts[0].targets,review.targets);
+    assert.equal(starts[0].owned,true);
+    assert.doesNotMatch(recipient,/appControlWindow\.(cpuBulk|prepareCpuBulk|confirmCpuBulk|cancelCpuBulk|acknowledgeCpuBulk|hunterOperationPhase|hunterOperationKind)/);
+});
+
+test("K4e: Hunter dispatch reads the service policy and never the legacy dialog host", () => {
+    const store=read("services/kill/KillStore.qml");
+    const controller=read("services/kill/HunterOperationController.qml");
+    assert.match(store,/policyOwner: root/);
+    assert.match(controller,/policyOwner\.collectionEnabled === true/);
+    assert.match(controller,/for \(const row of policyOwner\.rows\)/);
+    assert.match(controller,/policyOwner\.taskEligibleForKillAll\(row\)/);
+    assert.match(controller,/policyOwner\.hunterMouseProtectedReason\(row\)/);
+    assert.doesNotMatch(controller,/host\.(taskRows|taskEligibleForKillAll|hunterMouseProtectedReason|taskPersistentIdentity)/);
+    const begin=controller.indexOf("    function liveRow("),end=controller.indexOf("    function dispatchNext(",begin);
+    const policy={rows:[{pid:4321,startTicks:999,comm:"Synthetic"}]};
+    const api=new Function("policyOwner","FavoriteIdentity","let policyReady=true;"+controller.slice(begin,end)
+        +"\nreturn {liveRow,ready:v=>policyReady=v};")(policy,{taskIdentity:r=>r.comm.toLowerCase()});
+    const target={pid:4321,startTicks:999,name:"Synthetic",identity:"synthetic"};
+    assert.equal(api.liveRow(target),policy.rows[0]);
+    assert.equal(api.liveRow({...target,startTicks:998}),null);
+    api.ready(false);
+    assert.equal(api.liveRow(target),null);
 });

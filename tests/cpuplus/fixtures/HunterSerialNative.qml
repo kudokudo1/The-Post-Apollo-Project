@@ -10,7 +10,6 @@ ShellRoot {
     property var fourth: ({pid:3013,startTicks:40,comm:"delta",identity:"delta"})
     QtObject {
         id: fakeHost
-        property var taskRows: [root.first,root.second,root.third,root.fourth]
         property string destructiveConfirmMessage: ""
         property string destructiveConfirmKind: ""
         property string destructiveConfirmTitle: ""
@@ -18,9 +17,14 @@ ShellRoot {
         property bool destructiveConfirmOpen: false
         property var destructiveConfirmTargetPids: []
         property bool cancelled: false
+        function cancelDestructiveConfirm() { cancelled=true; }
+    }
+    QtObject {
+        id: policy
+        property bool collectionEnabled: true
+        property var rows: [root.first,root.second,root.third,root.fourth]
         function taskEligibleForKillAll(row) { return !row.protected; }
         function hunterMouseProtectedReason(row) { return row.protected ? "PROTECTED" : ""; }
-        function cancelDestructiveConfirm() { cancelled=true; }
     }
     QtObject { id: favorites; property var favoriteKeys: [] }
     QtObject { id: refresh; function restart() {} }
@@ -52,6 +56,7 @@ ShellRoot {
     HunterOperationController {
         id: controller
         host: fakeHost
+        policyOwner: policy
         favoriteStoreObject: favorites
         executor: engine
         refreshTimer: refresh
@@ -71,13 +76,13 @@ ShellRoot {
     }
     function runChecks() {
         if (Quickshell.env("POST_APOLLO_HUNTER_DISPOSABLE_CI") !== "1") {Qt.quit();return;}
-        const captured=controller.targetsFromRows(fakeHost.taskRows);
+        const captured=controller.targetsFromRows(policy.rows);
         controller.start("kill-hogs",[captured[0],captured[0]]);
         if (!check(fakeHost.cancelled && engine.calls.length===0,"duplicate capture refused")) return;
         controller.start("kill-hogs",captured);
         if (!check(engine.calls.length===1 && engine.running,"one target dispatched")) return;
         favorites.favoriteKeys=["task|beta"];
-        fakeHost.taskRows=[first,second,{pid:3012,startTicks:31,comm:"gamma",identity:"gamma"},fourth];
+        policy.rows=[first,second,{pid:3012,startTicks:31,comm:"gamma",identity:"gamma"},fourth];
         engine.exit(true);
         Qt.callLater(function() {
             if (!check(engine.calls.length===2 && engine.calls[1].pid===fourth.pid
@@ -88,15 +93,15 @@ ShellRoot {
             Qt.callLater(function() {
                 if (!check(controller.phase==="report" && controller.results.length===4,"one result per capture")) return;
                 favorites.favoriteKeys=[];
-                fakeHost.taskRows=[first,second,third,fourth];
-                controller.start("kill-mice",controller.targetsFromRows(fakeHost.taskRows));
+                policy.rows=[first,second,third,fourth];
+                controller.start("kill-mice",controller.targetsFromRows(policy.rows));
                 if (!check(engine.calls.length===3,"second operation began")) return;
                 engine.exit(false);
                 if (!check(controller.phase==="report" && controller.results.length===4
                            && engine.calls.length===3,"unknown result stops remaining dispatch")) return;
                 for (const mode of ["escaped","abnormal","malformed","timeout","duplicate"]) {
                     const before=engine.calls.length;
-                    controller.start("kill-hogs",controller.targetsFromRows(fakeHost.taskRows));
+                    controller.start("kill-hogs",controller.targetsFromRows(policy.rows));
                     engine.exit(true,mode);
                     if (!check(controller.phase==="report" && engine.calls.length===before+1
                             && controller.results.length===4
@@ -115,8 +120,23 @@ ShellRoot {
                 Qt.callLater(function() {
                     if (!check(controller.phase==="report" && controller.results.length===1
                                && engine.calls.length===priorCalls+1,"Kill All reports reviewed set only")) return;
-                    console.log("HUNTER_SERIAL_PASS");
-                    Qt.quit();
+                    const before=engine.calls.length;
+                    controller.host=null;
+                    policy.collectionEnabled=false;
+                    controller.start("kill-all",[captured[0]],true);
+                    if (!check(engine.calls.length===before,"unavailable policy refused")) return;
+                    policy.collectionEnabled=true;
+                    controller.start("kill-all",[captured[0]],true);
+                    if (!check(engine.calls.length===before+1 && controller.recipientOwned,
+                               "recipient starts without legacy dialog host")) return;
+                    policy.collectionEnabled=false;
+                    engine.exit(true);
+                    Qt.callLater(function() {
+                        if (!check(controller.phase==="report" && controller.results.length===1,
+                                   "recipient report without legacy host")) return;
+                        console.log("HUNTER_SERIAL_PASS");
+                        Qt.quit();
+                    });
                 });
             });
         });

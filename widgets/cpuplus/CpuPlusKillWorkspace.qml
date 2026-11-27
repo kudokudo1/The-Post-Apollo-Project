@@ -54,16 +54,16 @@ Item {
     readonly property var ownerFavoriteStore: appControlWindow
         ? appControlWindow.favoriteStore : null
     property var bulkReview: null
-    readonly property bool bulkAvailable: !!appControlWindow
-        && typeof appControlWindow.prepareCpuBulkReview === "function"
+    readonly property bool bulkAvailable: !!collectionSource
+        && typeof collectionSource.prepareCpuBulkReview === "function"
     readonly property bool hasBulkReview: !!bulkReview && bulkAvailable
-        && appControlWindow.cpuBulkReview === bulkReview
-    readonly property bool bulkOperation: bulkAvailable && !!appControlWindow.cpuBulkOperation
+        && collectionSource.cpuBulkReview === bulkReview
+    readonly property bool bulkOperation: bulkAvailable && !!collectionSource.cpuBulkOperation
     readonly property bool hunterOperationActive: bulkOperation
-        && appControlWindow.hunterOperationPhase === "running"
+        && collectionSource.hunterOperationPhase === "running"
     readonly property bool destructiveConfirmOpen: hasBulkReview || bulkOperation
     readonly property string destructiveConfirmKind: hasBulkReview ? bulkReview.kind
-        : bulkOperation ? appControlWindow.hunterOperationKind : ""
+        : bulkOperation ? collectionSource.hunterOperationKind : ""
     property bool ready: false
     property bool modelBlank: false
     property int viewSerial: 0
@@ -285,7 +285,7 @@ Item {
         if (bulkOperation) return [{}]; // existing report can be reopened
         if (hasBulkReview || locallyPending || (gate && (gate.pending || gate.busy))) return [];
         const revision = miniHistoryRevision;
-        return appControlWindow.cpuBulkCandidates(kind,hunterMetricMode,hunterVisibilityMode);
+        return collectionSource.cpuBulkCandidates(kind,hunterMetricMode,hunterVisibilityMode);
     }
     function killAllEligibleTasks() { return bulkCandidates("kill-all"); }
     function hunterHogCandidates() { return bulkCandidates("kill-hogs"); }
@@ -294,19 +294,19 @@ Item {
         if (!active || !bulkAvailable) return false;
         if (bulkOperation || hasBulkReview) return true;
         if (locallyPending || modelBlank || (gate && (gate.pending || gate.busy))) return false;
-        bulkReview = appControlWindow.prepareCpuBulkReview(kind,hunterMetricMode,hunterVisibilityMode);
+        bulkReview = collectionSource.prepareCpuBulkReview(kind,hunterMetricMode,hunterVisibilityMode);
         return hasBulkReview;
     }
     function requestKillAllEligibleTasks() { return requestBulk("kill-all"); }
     function requestKillHogs() { return requestBulk("kill-hogs"); }
     function requestKillMice() { return requestBulk("kill-mice"); }
     function cancelBulk() {
-        if (hasBulkReview) appControlWindow.cancelCpuBulkReview(bulkReview);
+        if (hasBulkReview) collectionSource.cancelCpuBulkReview(bulkReview);
         bulkReview = null;
     }
     function confirmBulk() {
         if (!active || !hasBulkReview) return false;
-        const accepted = appControlWindow.confirmCpuBulkReview(bulkReview);
+        const accepted = collectionSource.confirmCpuBulkReview(bulkReview);
         if (accepted) bulkReview = null;
         return accepted;
     }
@@ -1330,7 +1330,7 @@ Item {
                 readonly property bool single: workspace.hasOwnedPending
                 readonly property bool report: workspace.bulkOperation
                 readonly property bool reportReady: report
-                    && workspace.appControlWindow.hunterOperationPhase === "report"
+                    && workspace.collectionSource.hunterOperationPhase === "report"
                 readonly property bool verifying: workspace.locallyPending && !!workspace.gate
                     && workspace.gate.busy && workspace.gate.pending === workspace.ownedPendingRef
                 readonly property var singleTarget: single || verifying ? workspace.ownedPendingRef : null
@@ -1374,7 +1374,7 @@ Item {
                             color: Colors.red
                             font.pixelSize: 13
                             text: reviewPanel.capture ? "REVIEW // " + workspace.bulkReview.label
-                                : reviewPanel.report ? "BULK // " + String(workspace.appControlWindow.hunterOperationKind).toUpperCase()
+                                : reviewPanel.report ? "BULK // " + String(workspace.collectionSource.hunterOperationKind).toUpperCase()
                                 : reviewPanel.singleTarget ? "REVIEW // " + String(reviewPanel.singleTarget.action).toUpperCase() : ""
                             layer.enabled: reviewPanel.visible
                             layer.effect: DropShadow { radius: 6; samples: 7; opacity: 0.65; color: Colors.red; transparentBorder: true }
@@ -1514,7 +1514,7 @@ Item {
                                         ? "\nWARNING // PROTECTED PROCESS\n" + workspace.protectedProcessRisk(workspace.currentTask)
                                         : ""))
                                 : reviewPanel.verifying ? workspace.gate.feedback
-                                : reviewPanel.report ? workspace.appControlWindow.cpuBulkMessage : ""
+                                : reviewPanel.report ? workspace.collectionSource.cpuBulkMessage : ""
                             color: reviewPanel.report ? Colors.white : Colors.red
                             font.pixelSize: 12
                             layer.enabled: reviewTextScroll.visible
@@ -1587,7 +1587,7 @@ Item {
                             onLeftClicked: {
                                 if (workspace.hasBulkReview) workspace.cancelBulk();
                                 else if (workspace.hasOwnedPending) workspace.cancelOwned();
-                                else if (reviewPanel.reportReady) workspace.appControlWindow.acknowledgeCpuBulkReport();
+                                else if (reviewPanel.reportReady) workspace.collectionSource.acknowledgeCpuBulkReport();
                             }
                         }
                     }

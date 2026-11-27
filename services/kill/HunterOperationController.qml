@@ -4,7 +4,10 @@ import "../favorites/FavoritesAppControlIdentityPolicy.js" as FavoriteIdentity
 QtObject {
     id: hunterOperationController
 
-    required property var host
+    required property var host // legacy presentation only
+    required property var policyOwner
+    readonly property bool policyReady: !!policyOwner && policyOwner.collectionEnabled === true
+        && Array.isArray(policyOwner.rows) && !!favoriteStoreObject && !!favoriteStoreObject.favoriteKeys
     required property var favoriteStoreObject
     required property var executor
     required property var refreshTimer
@@ -24,7 +27,7 @@ QtObject {
     property bool activeProtocolError: false
 
     function targetsFromRows(rows) {
-        if (!host || !Array.isArray(rows)) return [];
+        if (!Array.isArray(rows)) return [];
         return rows.map(function(entry) {
             return {
                 pid: Number(entry.pid || 0),
@@ -130,7 +133,7 @@ QtObject {
     }
 
     function start(operationKind, operationTargets, cpuRecipient) {
-        if (!host || !favoriteStoreObject) return;
+        if (!policyReady || (cpuRecipient !== true && !host)) return;
         if (phase === "running") {
             showWindow();
             return;
@@ -150,7 +153,7 @@ QtObject {
                     || typeof target.name !== "string" || !target.name
                     || typeof target.identity !== "string" || !target.identity
                     || seen.has(target.pid)) {
-                host.cancelDestructiveConfirm();
+                if (host && cpuRecipient !== true) host.cancelDestructiveConfirm();
                 return;
             }
             seen.add(target.pid);
@@ -200,8 +203,8 @@ QtObject {
     }
 
     function liveRow(target) {
-        if (!host || !Array.isArray(host.taskRows)) return null;
-        for (const row of host.taskRows) {
+        if (!policyReady) return null;
+        for (const row of policyOwner.rows) {
             if (Number(row.pid) === target.pid
                     && Number(row.startTicks) === target.startTicks
                     && String(row.comm || row.name || "").trim() === target.name
@@ -214,7 +217,7 @@ QtObject {
     function dispatchNext() {
         if (phase !== "running" || activeTarget || executor.running)
             return;
-        if (!host || !favoriteStoreObject) { stopRemaining(); return; }
+        if (!policyReady) { stopRemaining(); return; }
         while (cursor < targets.length) {
             const target = targets[cursor++];
             if (targetIsFavorite(target)) {
@@ -226,8 +229,8 @@ QtObject {
                 record(target, "gone", "CAPTURED IDENTITY NO LONGER OBSERVED");
                 continue;
             }
-            if (!host.taskEligibleForKillAll(row)
-                    || (kind === "kill-mice" && host.hunterMouseProtectedReason(row).length > 0)) {
+            if (!policyOwner.taskEligibleForKillAll(row)
+                    || (kind === "kill-mice" && policyOwner.hunterMouseProtectedReason(row).length > 0)) {
                 record(target, "escaped", "CURRENT PROTECTION • NO SIGNAL");
                 continue;
             }

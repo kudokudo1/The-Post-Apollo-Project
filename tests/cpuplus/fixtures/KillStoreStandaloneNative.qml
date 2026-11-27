@@ -84,8 +84,8 @@ ShellRoot {
         const reused={pid:4321,startTicks:98766,comm:"sway",user:"synthetic"};
         const unknown={pid:4321,startTicks:0,comm:"sway",user:"synthetic"};
         const safety=first.store.safety;
-        // With no donor policy installed, even a syntactically valid synthetic
-        // capture must not start a hunt or arm the executor.
+        // Collection is disabled in the standalone scene. A synthetic
+        // capture must not arm the executor even with the canonical policy.
         first.store.hunterOperation.start("kill-all", [{
             pid:4321,startTicks:98765,name:"sway",identity:"synthetic"}],true);
         if (safety !== second.store.safety
@@ -98,6 +98,8 @@ ShellRoot {
                 || first.store.hunterOperation !== second.store.hunterOperation
                 || first.store.hunterOperation.phase !== "idle"
                 || first.store.hunterOperation.host !== null
+                || first.store.hunterOperation.policyOwner !== first.store
+                || first.store.hunterOperation.policyReady
                 || first.store.hunterOperation.favoriteStoreObject !== FavoritesStore
                 || first.store.favoriteStore !== second.store.favoriteStore
                 || !safety.requiresDangerUnlock(old)

@@ -20,6 +20,7 @@ Scope {
     // Demand flags are presentation inputs, never a second collector.
     property bool collectionEnabled: false
     property bool cpuVisible: false
+    onCpuVisibleChanged: if (!cpuVisible) cancelCpuBulkReview(cpuBulkReview)
     property bool donorResourceVisible: false
     property bool donorKillVisible: false
     property bool donorFavoritesVisible: false
@@ -40,8 +41,8 @@ Scope {
     readonly property var safety: safetyState
     readonly property var control: controlBackend
     readonly property var limits: limitBackend
-    // One long-lived execution lifecycle. Transitional donor supplies
-    // candidate policy and legacy confirmation presentation, not execution state.
+    // One long-lived execution lifecycle. Donor supplies legacy confirmation
+    // presentation only; process policies and live rows belong to this store.
     property var donorHunterHost: null
     // Transitional compositor snapshot; null is unknown, not an empty desktop.
     property var hunterVisibleWindows: null
@@ -51,6 +52,7 @@ Scope {
     HunterOperationController {
         id: hunterController
         host: root.donorHunterHost
+        policyOwner: root
         favoriteStoreObject: root.favoriteStore
         executor: hunterExecution
         refreshTimer: afterAction
@@ -67,6 +69,7 @@ Scope {
     // Shared individual action authority. Only the transitional legacy
     // confirmation UI selects donorTask and contributes its bulk exclusion.
     property var donorTask: null
+    // Legacy dialog exclusion only; the service owns bulk exclusion below.
     property bool donorActionBlocked: false
     readonly property var presentation: actionPresentation
     readonly property var actionGate: guardedActions
@@ -87,7 +90,8 @@ Scope {
         controlOwner: root.control
         limitsOwner: root.limits
         refreshOwner: root.refreshAfterActionTimer
-        bulkBlocked: root.donorActionBlocked
+        bulkBlocked: root.donorActionBlocked || root.cpuBulkReview !== null
+            || root.hunterOperation.phase !== "idle"
     }
 
     TaskSafety { id: safetyState }
@@ -122,9 +126,66 @@ Scope {
         return true;
     }
 
-    // One immutable recipient review. Candidate selection and final execution
-    // admission remain with the existing donor until Hunter custody moves.
+    // Recipient supplies only a metric and visibility. All captures and
+    // one-use admission are service owned; legacy dialogs remain exclusive.
+    function cpuBulkCandidates(kind, metric, visibility) {
+        if (!cpuVisible || !Number.isInteger(metric) || metric < 0 || metric > 4
+                || !Number.isInteger(visibility) || visibility < 0 || visibility > 2)
+            return [];
+        if (kind !== "kill-all" && visibility === 1) return [];
+        const rows = kind === "kill-all" ? killAllEligibleTasks()
+            : kind === "kill-hogs" ? hunterHogCandidates(metric)
+            : kind === "kill-mice" ? hunterMouseCandidates() : [];
+        return rows.filter(function(row) {
+            const target = hunterOperation.targetsFromRows([row])[0];
+            return target && Number.isSafeInteger(target.pid) && target.pid > 1
+                && Number.isSafeInteger(target.startTicks) && target.startTicks > 0
+                && !!target.name && !!target.identity && !hunterOperation.targetIsFavorite(target);
+        });
+    }
+
+    function prepareCpuBulkReview(kind, metric, visibility) {
+        if (!cpuVisible || cpuBulkReview || donorActionBlocked
+                || hunterOperationPhase !== "idle" || actionGate.pending
+                || actionGate.busy) return null;
+        const rows = cpuBulkCandidates(kind, metric, visibility);
+        const captures = hunterOperation.targetsFromRows(rows);
+        return captureCpuBulkReview(kind, metric, visibility, captures);
+    }
+
+    function cancelCpuBulkReview(review) {
+        return releaseCpuBulkReview(review);
+    }
+
+    function confirmCpuBulkReview(review) {
+        if (!review || cpuBulkReview !== review || !cpuVisible
+                || donorActionBlocked || hunterOperationPhase !== "idle"
+                || actionGate.pending || actionGate.busy
+                || !hunterOperation.policyReady) return false;
+        // Consume the exact review once; never recompute or broaden it.
+        if (!releaseCpuBulkReview(review)) return false;
+        hunterOperation.start(review.kind, review.targets, true);
+        return true;
+    }
+
+    function acknowledgeCpuBulkReport() {
+        if (!cpuBulkOperation || hunterOperationPhase !== "report") return false;
+        hunterOperation.phase = "idle";
+        hunterOperation.kind = "";
+        hunterOperation.targets = [];
+        hunterOperation.results = [];
+        hunterOperation.completed = 0;
+        hunterOperation.total = 0;
+        return true;
+    }
+
+    // One immutable recipient review.
     property var cpuBulkReview: null
+    readonly property bool cpuBulkOperation: hunterOperation.recipientOwned
+        && hunterOperation.phase !== "idle"
+    readonly property string cpuBulkMessage: cpuBulkOperation ? hunterOperation.message : ""
+    readonly property string hunterOperationPhase: hunterOperation.phase
+    readonly property string hunterOperationKind: hunterOperation.kind
 
     function captureCpuBulkReview(kind, metric, visibility, captures) {
         if (cpuBulkReview || actionGate.pending || actionGate.busy || actionGate.bulkBlocked)

@@ -86,6 +86,10 @@ ShellRoot {
         if (safety !== second.store.safety
                 || first.store.control !== second.store.control
                 || first.store.limits !== second.store.limits
+                || first.store.hunterExecutor !== second.store.hunterExecutor
+                || first.store.hunterExecutor.running
+                || first.store.hunterExecutor.expectedTarget !== null
+                || first.store.hunterExecutor.completionVerified
                 || !safety.requiresDangerUnlock(old)
                 || first.store.limits.applyLoading
                 || first.store.limits.activeRequest !== null

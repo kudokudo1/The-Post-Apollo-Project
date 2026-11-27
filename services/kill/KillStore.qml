@@ -49,7 +49,7 @@ Scope {
     readonly property var limits: limitBackend
     // One long-lived execution lifecycle. Donor supplies legacy confirmation
     // presentation only; process policies and live rows belong to this store.
-    property var donorHunterHost: null
+    property bool donorHunterPresentationAvailable: false
     // One compositor inventory shared with APPS/WINDOWS; unknown is not empty.
     readonly property var windowInventory: compositor
     readonly property var hunterVisibleWindows: compositor.settled ? compositor.windows : null
@@ -62,7 +62,7 @@ Scope {
     readonly property var hunterOperation: hunterController
     HunterOperationController {
         id: hunterController
-        host: root.donorHunterHost
+        legacyPresentationAvailable: root.donorHunterPresentationAvailable
         policyOwner: root
         favoriteStoreObject: root.favoriteStore
         executor: hunterExecution

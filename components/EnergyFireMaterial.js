@@ -43,7 +43,7 @@ function drawAsh(c,x,y,w,h,edge,hot) {
 }
 // Render only the remaining solid chassis. The left region is genuinely
 // transparent except for small stationary burnt fragments near the cut.
-function drawRemaining(c,x,y,w,h,edge,hot,border,inset) {
+function drawRemaining(c,x,y,w,h,edge,hot,border,inset,remainingAsh) {
     const remaining=Math.max(0,x+w-edge);
     if(remaining>0 && h>0) {
         const n=Math.min(remaining,h*.24);
@@ -67,8 +67,15 @@ function drawRemaining(c,x,y,w,h,edge,hot,border,inset) {
             const left=Math.max(x+pad,edge+pad);
             const right=x+w-pad;
             if(right>left && h>2*pad) {
-                c.fillStyle=g;
-                c.fillRect(left,y+pad,right-left,h-2*pad);
+                if(remainingAsh) {
+                    // Keep the original ash grain anchored to the full
+                    // material, but clip it to the surviving right side.
+                    c.beginPath(); c.rect(left,y+pad,right-left,h-2*pad); c.clip();
+                    drawAsh(c,x+pad,y+pad,w-2*pad,h-2*pad,right,0);
+                } else {
+                    c.fillStyle=g;
+                    c.fillRect(left,y+pad,right-left,h-2*pad);
+                }
             }
             c.restore();
         } else {

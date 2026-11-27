@@ -268,6 +268,13 @@ Scope {
     property bool discoveringRepos: false
     property bool actionBusy: false
     property string actionStage: "IDLE"
+    // Observational timestamp only. Silence is not proof the child is hung.
+    property double actionLastActivityAt: 0
+    onActionBusyChanged: if (actionBusy) actionLastActivityAt = Date.now()
+    onActionStageChanged: if (actionBusy) actionLastActivityAt = Date.now()
+    function noteActionActivity() {
+        if (actionBusy) actionLastActivityAt = Date.now();
+    }
     property bool actionProcessDoneSeen: false
     property double syncAfterSnapshotStartedMs: 0
     property double syncAfterRefreshStartedMs: 0
@@ -2854,6 +2861,7 @@ Scope {
 
     function consumeActionLine(line) {
         const raw = String(line || "");
+        if (raw.length > 0) noteActionActivity();
 
         if (raw.indexOf("__PA_CLONE_META__\t") === 0) {
             const parts = raw.split("\t");
@@ -3162,10 +3170,12 @@ Scope {
                 const splitReadTrace = gitService.beginSplitRead("action-stderr", line);
                 const message = String(line || "").trim();
 
-                if (message.length > 0)
+                if (message.length > 0) {
+                    gitService.noteActionActivity();
                     gitService.actionOutput += (
                         gitService.actionOutput.length > 0 ? "\n" : ""
                     ) + gitService.friendlyActionError(message);
+                }
                 gitService.endSplitRead("action-stderr", splitReadTrace);
             }
         }

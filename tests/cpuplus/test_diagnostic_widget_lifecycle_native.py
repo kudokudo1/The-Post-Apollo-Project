@@ -19,7 +19,7 @@ with tempfile.TemporaryDirectory(prefix="cpu-lifecycle-native-") as tmp:
     # synthetic memory rows only (not evidence of real /proc identity).
     scripts=scene/"scripts"
     scripts.mkdir()
-    for name in ("cpuplus_diagnostic_workflow_catalog.py","cpuplus_diagnostic_archive.py","cpuplus_diagnostic_workflow.py"):
+    for name in ("cpuplus_diagnostic_workflow_catalog.py","cpuplus_diagnostic_archive.py","cpuplus_diagnostic_workflow.py","syntagma_quickshell_thread_sampler.py"):
         shutil.copy2(ROOT/"scripts"/name,scripts/name)
     (scripts/"cpuplus_quickshell_memory_observer.py").write_text("""
 import json,sys,time

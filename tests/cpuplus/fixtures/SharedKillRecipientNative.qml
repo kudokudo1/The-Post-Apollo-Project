@@ -346,6 +346,9 @@ ShellRoot {
                 const resourceInfo=smoke.find(view,"cpuPlusResourceInformationButton");
                 const resourcePopup=smoke.find(view,"cpuPlusResourceInformationPopup");
                 const headerSection=smoke.find(view,"cpuPlusResourceHeaderSection");
+                const headerTitle=smoke.find(view,"cpuPlusResourceHeaderTitle");
+                const titleDivider=smoke.find(view,"cpuPlusResourceTitleDivider");
+                const selectionStatus=smoke.find(view,"cpuPlusResourceIdentityStatus");
                 const headerResourceTitle=smoke.find(view,"cpuPlusResourceSelectedTitle");
                 const headerCapability=smoke.find(view,"cpuPlusResourceCapabilityStatus");
                 const controlsScroll=smoke.find(view,"cpuPlusResourceConsoleScroll");
@@ -414,6 +417,24 @@ ShellRoot {
                 const footerPosition=footerDivider ? footerDivider.mapToItem(consolePane,0,0) : null;
                 const headerTop=headerSection ? headerSection.mapToItem(consolePane,0,0) : null;
                 const controlsTop=controlsScroll ? controlsScroll.mapToItem(consolePane,0,0) : null;
+                // Exactly two lines: the first directly BELOW the title
+                // and immediately ABOVE the resource buttons. The status is
+                // below the buttons and there is NO surrounding header frame.
+                const posTitle=headerTitle ? headerTitle.mapToItem(consolePane,0,0) : null;
+                const posFirstRule=titleDivider ? titleDivider.mapToItem(consolePane,0,0) : null;
+                const posStatus=selectionStatus ? selectionStatus.mapToItem(consolePane,0,0) : null;
+                const posBottomRule=headerDivider ? headerDivider.mapToItem(consolePane,0,0) : null;
+                if (!smoke.check(headerSection && headerTitle && titleDivider
+                        && selectionStatus && headerDivider && cpuFilter
+                        && posTitle && posFirstRule && posStatus && posBottomRule
+                        && posTitle.y+headerTitle.height<=posFirstRule.y+1
+                        && posFirstRule.y+titleDivider.height<=filterPosition.y+1
+                        && filterPosition.y+cpuFilter.height<=posStatus.y+1
+                        && posStatus.y+selectionStatus.height<=posBottomRule.y+1
+                        && titleDivider.height===2 && headerDivider.height===2
+                        && Qt.colorEqual(titleDivider.color,"#D16041")
+                        && Qt.colorEqual(headerDivider.color,"#D16041"),
+                        "unboxed title / top red rule / filters / status / bottom red rule order")) return;
                 if (!smoke.check(headerSection && headerResourceTitle
                         && headerCapability && controlsScroll && headerTop && controlsTop
                         && headerSection.height>=112

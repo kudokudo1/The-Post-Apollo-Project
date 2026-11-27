@@ -63,19 +63,15 @@ Item {
         return Colors.cyan;
     }
 
-    // Use the same fixed-header / changing-content / action-footer hierarchy
-    // seen in CPU++ FAVORITES and ID MANAGEMENT. The header is a real
-    // reserved region, not scattered labels in the scrolling controls.
-    Rectangle {
+    // Favorites / ID Management structure: a fixed UNBOXED top region
+    // separated by two horizontal rules, never an enclosing frame.
+    Item {
         id: resourceHeaderSection
         objectName: "cpuPlusResourceHeaderSection"
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
         height: headerContent.implicitHeight + 16
-        color: Colors.dark
-        border.width: 1
-        border.color: Colors.red
         z: 10
 
         Column {
@@ -97,17 +93,14 @@ Item {
                 color: Colors.orange
                 elide: Text.ElideRight
             }
-            GohuText {
-                objectName: "cpuPlusResourceIdentityStatus"
+            // First horizontal rule goes immediately below the title.
+            // No status or label is allowed between rule and resource tabs.
+            Rectangle {
+                objectName: "cpuPlusResourceTitleDivider"
                 width: parent.width
-                height: 13
-                text: root.selectionReady ? "EXACT PROCESS SELECTED // NOT APPLIED"
-                    : "SELECT VERIFIED PROCESS // READ ONLY"
-                font.pixelSize: 9
-                color: root.selectionReady ? Colors.white : Colors.yellow
-                elide: Text.ElideRight
+                height: 2
+                color: Colors.red
             }
-
             // The seven category selectors are one stable header rail.
             Row {
                 id: resourceFilters
@@ -167,6 +160,16 @@ Item {
                     selected: root.informationOpen
                     onLeftClicked: root.informationOpen = !root.informationOpen
                 }
+            }
+            GohuText {
+                objectName: "cpuPlusResourceIdentityStatus"
+                width: parent.width
+                height: 13
+                text: root.selectionReady ? "EXACT PROCESS SELECTED // NOT APPLIED"
+                    : "SELECT VERIFIED PROCESS // READ ONLY"
+                font.pixelSize: 9
+                color: root.selectionReady ? Colors.white : Colors.yellow
+                elide: Text.ElideRight
             }
             GohuText {
                 objectName: "cpuPlusResourceCapabilityStatus"

@@ -154,3 +154,33 @@ test("K8d4 fixed Favorites-style header separates metadata from control workspac
     assert.ok(ui.slice(actions,footer).includes('objectName: "cpuPlusResourceWorkspaceActions"'));
     assert.ok(ui.slice(footer).includes('APPLY LOCKED // UNVERIFIED'));
 });
+
+test("K8d5 header uses two rules, no enclosing box, and no status before resource tabs",()=>{
+    const ui=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceConsole.qml"),"utf8");
+    const start=ui.indexOf('id: resourceHeaderSection');
+    const end=ui.indexOf('id: bodyScroll',start);
+    assert.ok(start>0 && end>start);
+    const header=ui.slice(start,end);
+    const intro=header.slice(0,header.indexOf('id: headerContent'));
+    assert.ok(ui.includes('Item {\n        id: resourceHeaderSection'));
+    assert.ok(!intro.includes('border.width'));
+    assert.ok(!intro.includes('border.color'));
+    assert.ok(!intro.includes('color: Colors.dark'));
+    const title=header.indexOf('objectName: "cpuPlusResourceHeaderTitle"');
+    const titleRule=header.indexOf('objectName: "cpuPlusResourceTitleDivider"');
+    const tabs=header.indexOf('id: resourceFilters');
+    const info=header.indexOf('id: resourceInfoStrip');
+    const status=header.indexOf('objectName: "cpuPlusResourceIdentityStatus"');
+    const capability=header.indexOf('objectName: "cpuPlusResourceCapabilityStatus"');
+    const sectionRule=header.indexOf('objectName: "cpuPlusResourceHeaderDivider"');
+    assert.ok(title>=0 && title<titleRule && titleRule<tabs && tabs<info
+        && info<status && status<capability && capability<sectionRule);
+    assert.equal((header.match(/objectName: "cpuPlusResourceTitleDivider"/g)||[]).length,1);
+    assert.equal((header.match(/objectName: "cpuPlusResourceHeaderDivider"/g)||[]).length,1);
+    assert.match(header.slice(titleRule,tabs),/height: 2\s*color: Colors.red/);
+    assert.match(header.slice(sectionRule),/height: 2\s*color: Colors.red/);
+    assert.ok(!header.slice(titleRule,tabs).includes('SELECT VERIFIED PROCESS'));
+    assert.match(ui,/anchors.top: resourceHeaderSection.bottom/);
+    assert.ok(ui.includes('objectName: "cpuPlusResourceInformationButton"'));
+    assert.ok(ui.includes('label: "APPLY LOCKED // UNVERIFIED"'));
+});

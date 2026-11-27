@@ -75,7 +75,7 @@ test("recipient mounts actual donor Hunter controls, all filter rails, search an
     assert.match(recipient,/modelBlank=true;[\s\S]*?modelBlank=false;/);
     assert.match(recipient,/acceptedButtons: Qt.NoButton[\s\S]*?targets.indexAt/);
     assert.match(recipient,/if \(sameTarget\(row\)\) return true/);
-    for(const name of ["cpuPlusKillTargetScroll","cpuPlusKillInstrumentViewport","cpuPlusKillActuatorScroll"])
+    for(const name of ["cpuPlusKillTargetScroll","cpuPlusKillInstrumentViewport","cpuPlusQuickControlFooter"])
         assert.ok(recipient.includes(name));
     assert.match(recipient,/function killAllEligibleTasks\(\) \{ return bulkCandidates\("kill-all"\); \}/);
     assert.match(recipient,/collectionSource\.prepareCpuBulkReview\(kind,hunterMetricMode,hunterVisibilityMode\)/);
@@ -1086,7 +1086,7 @@ test("K7b: CPU++ process identity, glow clearance and yellow cancellation", () =
     assert.match(identity,/objectName: "cpuPlusProcessIdentityMetadata"[\s\S]*?layer.effect: DropShadow/);
     assert.match(recipient,/objectName: "cpuPlusProcessStateLabel"[\s\S]*?anchors.bottom: parent.bottom[\s\S]*?layer.effect: DropShadow/);
     assert.match(recipient,/objectName: "cpuPlusProcessGlowGutter"[\s\S]*?x: 8\s*y: 8\s*width: Math.max\(0,actuatorScroll.width-30\)/);
-    assert.match(recipient,/contentHeight: actuatorBody.implicitHeight \+ 20/);
+    assert.match(recipient,/contentHeight: height\s*interactive: false/);
 });
 
 test("K7c: independent selected detail channels share one mini publication", () => {
@@ -1145,4 +1145,25 @@ test("K7d: observed extra metric samples and no fabricated missing history", () 
     assert.match(recipient,/objectName: "cpuPlusDetailGraph-"\+extraMetric.modelData.key/);
     assert.match(recipient,/historyLimit: history.taskHistoryLimit\s*scrollDuration: history.taskGraphScrollDuration/);
     assert.match(read("services/kill/KillStore.qml"),/id: cpuGraph[\s\S]*?extraDetailHistoryEnabled: true/);
+});
+
+test("K7e: metric cards select at most two graphs and preserve fixed quick controls",()=>{
+    const a=recipient.indexOf("    function toggleMetricGraph(");
+    const b=recipient.indexOf("\n    readonly property var gate",a);
+    assert.ok(a>=0 && b>a);
+    const api=new Function("let selectedGraphKeys=['cpu','mem'];"+recipient.slice(a,b)+"\nreturn {toggleMetricGraph,get:()=>selectedGraphKeys};")();
+    for (const [key,want] of [["rss",["mem","rss"]],["threads",["rss","threads"]],["rss",["threads"]],["combined",["combined","score"]],["io",["io"]],["pid",["io"]],["io",[]]]) {
+        api.toggleMetricGraph(key);
+        assert.deepEqual(api.get(),want);
+    }
+    assert.match(donorView,/property bool metricGraphSelectionEnabled: false/);
+    assert.match(donorView,/onClicked: taskManagerBody.metricGraphRequested\(taskMetricCard.graphKey\)/);
+    assert.match(donorView,/host.toggleTaskMetricFavorite\(/);
+    assert.match(donorView,/Qt.tint\(Colors.black,Qt.rgba\(modelData.baseAccent.r/);
+    assert.match(recipient,/metricGraphSelectionEnabled: true\s*selectedGraphKeys: workspace.selectedGraphKeys/);
+    assert.match(recipient,/\.filter\(m=>workspace.selectedGraphKeys.indexOf\(m.key\)>=0\)/);
+    assert.match(recipient,/id: quickFooter[\s\S]*?anchors.bottom: parent.bottom/);
+    assert.match(recipient,/viewportHeight: Math.max\(1,actuatorScroll.height - quickFooter.height - 24\)/);
+    assert.doesNotMatch(recipient,/cpuPlusKillActuatorScroll/);
+    assert.match(recipient,/contentHeight: height\s*interactive: false/);
 });

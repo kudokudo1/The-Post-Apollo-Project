@@ -22,6 +22,7 @@ on:
       - 'widgets/appcontrol/ProcessSafetyLock.qml'
       - 'widgets/appcontrol/AppControlHubActionGate.qml'
       - 'tests/cpuplus/test_shared_kill_recipient.cjs'
+      - 'tests/cpuplus/test_process_limit_identity.cjs'
       - 'tests/cpuplus/test_shared_kill_recipient_native.py'
       - 'tests/cpuplus/fixtures/SharedKillRecipientNative.qml'
       - '.github/workflows/cpuplus-shared-kill-recipient.yml'
@@ -37,7 +38,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify shared Kill recipient source boundaries
-        run: node --test tests/cpuplus/test_shared_kill_recipient.cjs
+        run: node --test tests/cpuplus/test_shared_kill_recipient.cjs tests/cpuplus/test_process_limit_identity.cjs
   native:
     runs-on: ubuntu-latest
     timeout-minutes: 12

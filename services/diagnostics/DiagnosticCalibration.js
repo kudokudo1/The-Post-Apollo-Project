@@ -3,6 +3,7 @@
 // actual byte bounds, identity, cancellation and output validation still apply.
 function defaultsFor(kind) {
     switch (kind) {
+    case "diskio":
     case "gpu": return {kind:kind,durationSeconds:10,intervalMs:1000};
     case "hostcpu": return {kind:kind,durationSeconds:10,intervalMs:1000};
     case "threads": return {kind:kind,durationSeconds:30,intervalMs:1000,topCount:4};
@@ -81,10 +82,10 @@ function previewCalibration(input) {
                 return refuse("APPCONTROL V1 FIXED");
             fixed=true;
         }
-    } else if (kind==="hostcpu" || kind==="gpu") {
+    } else if (kind==="hostcpu" || kind==="gpu" || kind==="diskio") {
         if (duration>30 || interval<1000 || interval>5000 || interval%1000 || intervals>12)
             return refuse(kind.toUpperCase()+" // 1–30 SEC / 1–5 SEC INTERVAL / MAX 12 SAMPLES");
-        scope=kind==="gpu"?"all-hardware-drm-cards":"host-logical-cpus";
+        scope=kind==="gpu"?"all-hardware-drm-cards":kind==="diskio"?"device-backed-whole-block":"host-logical-cpus";
     } else if (kind==="memory") {
         if (!integer(interval,5000,60000)||interval%1000!==0||intervals>12)
             return refuse("MEMORY REPORT BUDGET");
@@ -121,7 +122,7 @@ function observerLaunchPlan(input, resolvePath, dataDir) {
             "/usr/bin/python3","-B",resolvePath("scripts/cpuplus_stall_clock_witness.py"),
             "--duration",String(config.durationSeconds)]};
     const scripts={memory:"cpuplus_quickshell_memory_observer.py",
-        census:"cpuplus_process_census.py",storage:"cpuplus_storage_observer.py",hostcpu:"cpuplus_host_cpu_observer.py",gpu:"cpuplus_gpu_observer.py"};
+        census:"cpuplus_process_census.py",storage:"cpuplus_storage_observer.py",hostcpu:"cpuplus_host_cpu_observer.py",gpu:"cpuplus_gpu_observer.py",diskio:"cpuplus_disk_io_observer.py"};
     if (!Object.prototype.hasOwnProperty.call(scripts,config.kind)) return null;
     const args=["/usr/bin/timeout","--kill-after=3s","145s","/usr/bin/python3","-B",
         resolvePath("scripts/"+scripts[config.kind]),"--workshop","--duration",String(config.durationSeconds)];
@@ -203,13 +204,14 @@ function workflowLaunchPlan(input,resolvePath,dataDir) {
 // only, never a stored launch command, readiness token, target PID or consent.
 function workshopPlanFromDraft(d) {
     const instruments=[];
-    for (const kind of ["threads","memory","census","storage","stall","hostcpu","gpu"]) {
+    for (const kind of ["threads","memory","census","storage","stall","hostcpu","gpu","diskio"]) {
         if (!d.selected.includes(kind)) continue;
         if (kind==="threads") instruments.push({kind:kind,intervalMs:d.threadIntervalMs,topCount:d.topCount});
         else if (kind==="memory") instruments.push({kind:kind,intervalMs:d.memoryIntervalMs});
         else if (kind==="census") instruments.push({kind:kind,intervalMs:d.censusIntervalMs});
         else if (kind==="hostcpu") instruments.push({kind:kind,intervalMs:d.hostCpuIntervalMs});
         else if (kind==="gpu") instruments.push({kind:kind,intervalMs:d.gpuIntervalMs});
+        else if (kind==="diskio") instruments.push({kind:kind,intervalMs:d.diskIoIntervalMs});
         else if (kind==="stall") instruments.push({kind:kind,thresholdMs:d.stallThresholdMs});
         else if (kind==="storage" && d.storageCadenceExplicit===true)
             instruments.push({kind:kind,sampleSeconds:d.storageSampleSeconds,reportSeconds:d.storageReportSeconds});
@@ -225,7 +227,7 @@ function workshopDraftFromPlan(plan) {
                     const d=Object.getOwnPropertyDescriptor(plan,k);return d && Object.prototype.hasOwnProperty.call(d,"value");
                 }) || !Array.isArray(plan.instruments)
                 || !plan.instruments.length || plan.instruments.length>5) return null;
-        const kinds=["threads","memory","census","storage","stall","hostcpu","gpu"];
+        const kinds=["threads","memory","census","storage","stall","hostcpu","gpu","diskio"];
         const items=plan.instruments;
         if (Reflect.ownKeys(items).length!==items.length+1 || items.some(c=>!c || Object.getPrototypeOf(c)!==Object.prototype
                 || Reflect.ownKeys(c).some(k=>typeof k!=="string" || !Object.prototype.hasOwnProperty.call(Object.getOwnPropertyDescriptor(c,k),"value"))
@@ -237,7 +239,7 @@ function workshopDraftFromPlan(plan) {
         } else if (!previewWorkflow(plan).ok) return null;
         const draft={durationSeconds:plan.durationSeconds,selected:[],
             threadIntervalMs:1000,memoryIntervalMs:10000,censusIntervalMs:10000,
-            topCount:4,stallThresholdMs:350,hostCpuIntervalMs:1000,gpuIntervalMs:1000,storageCadenceExplicit:false,storageSampleSeconds:1,storageReportSeconds:10};
+            topCount:4,stallThresholdMs:350,hostCpuIntervalMs:1000,gpuIntervalMs:1000,diskIoIntervalMs:1000,storageCadenceExplicit:false,storageSampleSeconds:1,storageReportSeconds:10};
         for (const c of items) {
             draft.selected.push(c.kind);
             if (c.kind==="threads") {draft.threadIntervalMs=c.intervalMs;draft.topCount=c.topCount;}
@@ -245,6 +247,7 @@ function workshopDraftFromPlan(plan) {
             else if (c.kind==="census") draft.censusIntervalMs=c.intervalMs;
             else if (c.kind==="hostcpu") draft.hostCpuIntervalMs=c.intervalMs;
             else if (c.kind==="gpu") draft.gpuIntervalMs=c.intervalMs;
+            else if (c.kind==="diskio") draft.diskIoIntervalMs=c.intervalMs;
             else if (c.kind==="stall") draft.stallThresholdMs=c.thresholdMs;
             else if (c.kind==="storage" && Object.prototype.hasOwnProperty.call(c,"sampleSeconds")) {
                 draft.storageCadenceExplicit=true;draft.storageSampleSeconds=c.sampleSeconds;draft.storageReportSeconds=c.reportSeconds;
@@ -332,7 +335,7 @@ function storageCadenceChoice(duration,sample,report,field,value) {
 function workshopSubjectKinds(subject) {
     if (subject==="CPU") return ["threads","census","hostcpu"];
     if (subject==="GPU") return ["gpu"];
-    if (subject==="STORAGE") return ["storage"];
+    if (subject==="STORAGE") return ["storage","diskio"];
     if (subject==="ALL") return ["threads","memory","census","storage","stall"];
     return [];
 }

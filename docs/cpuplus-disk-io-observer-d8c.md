@@ -45,3 +45,7 @@ archive/routing, PREPARE/START and native fixtures. Keep metadata capture
 separate from device I/O. Use the D8b shared status/selector layout; do not
 duplicate the workspace. Actual workstation acceptance and resource cost
 measurements remain separate. No protected or live system changes.
+
+## D8c-b integration
+
+Storage now offers separate metadata and whole-device disk I/O selectors in the same status band. Disk I/O runs alone; sequential workflow sets can contain both capture kinds. Calibrate duration and interval, PREPARE then START. REPORT → DISK shows bounded per-device throughput/IOPS and kernel I/O time summaries; all raw records are retained. The existing archive, exact report notification route and single-flight owner are reused. No new timer, protected action or physical-device write. Native disposable fixture checks exact argv, receipt, archive and remount; exact-head CI and desktop acceptance remain pending. Dedicated disk comparison deferred.

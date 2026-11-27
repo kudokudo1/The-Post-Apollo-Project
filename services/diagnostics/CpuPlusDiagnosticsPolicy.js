@@ -21,7 +21,7 @@ function archiveResponse(doc, submitted) {
 }
 
 function validKind(kind) {
-    return ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall", "hostcpu", "gpu"].indexOf(kind) >= 0;
+    return ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall", "hostcpu", "gpu", "diskio"].indexOf(kind) >= 0;
 }
 
 function reportLimit(kind) { return kind === "workflow" ? 300000 : 65536; }
@@ -36,7 +36,7 @@ function noticeFor(job, report) {
             || ["COMPLETE", "CANCELLED", "NOT VERIFIED"].indexOf(report.status) < 0)
         return null;
     const labels = {memory: "MEMORY OBSERVE", inventory: "SOURCE WORKLOAD SCAN",
-                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE", appcontrol: "APPCONTROL TEST", workflow: "DIAGNOSTIC WORKFLOW", stall: "UI STALL OBSERVE", hostcpu: "HOST CPU OBSERVE", gpu: "GPU OBSERVE"};
+                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE", appcontrol: "APPCONTROL TEST", workflow: "DIAGNOSTIC WORKFLOW", stall: "UI STALL OBSERVE", hostcpu: "HOST CPU OBSERVE", gpu: "GPU OBSERVE", diskio: "DISK I/O OBSERVE"};
     return {
         id: "apollo-cpu-diag-" + report.id,
         source: "CPU++",
@@ -148,6 +148,7 @@ function storageCadence(c) {
 // Observer receipts extend the terminal record rather than prepend a row,
 // keeping existing memory, census and storage projections compatible.
 function configuredEvidence(kind,text,expected) {
+    if (kind==="diskio") { const d=diskIoEvidence(text,expected); return d ? d.calibration : null; }
     if (kind==="gpu") { const d=gpuEvidence(text,expected); return d ? d.calibration : null; }
     if (kind==="hostcpu") { const d=hostCpuEvidence(text,expected); return d ? d.calibration : null; }
     if (kind==="threads") return configuredThreadEvidence(text,expected);
@@ -373,6 +374,7 @@ function appControlMetrics(text) {
     } catch (error) { return null; }
 }
 function summarize(kind, text) {
+    if (kind==="diskio") return diskIoSummary(text);
     if (kind==="gpu") return gpuSummary(text);
     if (kind==="hostcpu") return hostCpuSummary(text);
     if (kind === "stall") {
@@ -893,4 +895,70 @@ function gpuSummary(text) {
     });
     return "GPU // "+n+" observations / "+last.devices.length+" DRM devices / "+d.observedMs+" ms\n"
         +lines.join("\n\n")+"\nDriver-exposed point readings, not interval utilization or per-process attribution. TEMP1 is a uniquely associated hwmon sensor, not necessarily junction. Unsupported fields are N/A.";
+}
+
+
+// D8c-b: strictly admit only the bounded whole-device counter receipt.
+function diskIoEvidence(text,expected) {
+    try {
+        if(typeof text!=="string"||text.length>65536||/[^\x00-\x7f]/.test(text))return null;
+        const records=text.trim().split("\n").map(line=>JSON.parse(line)), end=records.pop();
+        const schema="post-apollo-disk-io-v1", integer=(x,min,max)=>Number.isSafeInteger(x)&&x>=min&&x<=max;
+        const keys=(o,k)=>!!o&&Object.keys(o).length===k.length&&k.every(x=>Object.prototype.hasOwnProperty.call(o,x));
+        const c=end&&end.calibration;
+        if(!keys(end,["schema","event","samples","observedMs","calibration"])
+            ||end.schema!==schema||end.event!=="complete"||!keys(c,["kind","durationSeconds","intervalMs"])
+            ||c.kind!=="diskio"||!integer(c.durationSeconds,1,30)
+            ||!integer(c.intervalMs,1000,Math.min(5000,c.durationSeconds*1000))||c.intervalMs%1000
+            ||(expected&&(!keys(expected,Object.keys(c))||Object.keys(c).some(k=>c[k]!==expected[k]))))return null;
+        const n=Math.ceil(c.durationSeconds*1000/c.intervalMs);
+        if(n>12||records.length!==n||end.samples!==n||!integer(end.observedMs,c.durationSeconds*1000,45000))return null;
+        let elapsed=0, identity=null, totals=null;
+        for(let i=0;i<n;i++){
+            const row=records[i];
+            if(!keys(row,["schema","event","sequence","elapsedMs","intervalMs","devices"])
+                ||row.schema!==schema||row.event!=="diskio"||row.sequence!==i+1
+                ||!integer(row.elapsedMs,Math.min((i+1)*c.intervalMs,c.durationSeconds*1000),end.observedMs)
+                ||!integer(row.intervalMs,1,45000)||row.elapsedMs!==elapsed+row.intervalMs
+                ||!Array.isArray(row.devices)||row.devices.length<1||row.devices.length>32)return null;
+            const devs=row.devices;
+            if(!devs.every((d,j)=>Array.isArray(d)&&d.length===13
+                &&typeof d[0]==="string"&&/^[A-Za-z0-9_.!+\-]{1,64}$/.test(d[0])
+                &&(j===0||d[0]>devs[j-1][0])
+                &&integer(d[1],0,1048575)&&integer(d[2],0,1048575)
+                &&(d[3]===null||integer(d[3],0,Number.MAX_SAFE_INTEGER))
+                &&d.slice(4).every(v=>integer(v,0,Number.MAX_SAFE_INTEGER))
+                &&d[5]%512===0&&d[8]%512===0)
+                ||new Set(devs.map(d=>d[1]+":"+d[2])).size!==devs.length)return null;
+            const next=JSON.stringify(devs.map(d=>d.slice(0,4)));
+            if(identity!==null&&identity!==next)return null;
+            if(totals===null)totals=devs.map(()=>Array(8).fill(0));
+            for(let j=0;j<devs.length;j++)for(let k=0;k<8;k++){
+                totals[j][k]+=devs[j][k+4];
+                if(!Number.isSafeInteger(totals[j][k]))return null;
+            }
+            identity=next;elapsed=row.elapsedMs;
+        }
+        if(elapsed!==end.observedMs)return null;
+        return {calibration:c,records:records,observedMs:elapsed,totals:totals};
+    }catch(_){return null;}
+}
+function diskIoSummary(text) {
+    const d=diskIoEvidence(text,null);
+    if(!d)return null;
+    const rows=d.records,last=rows[rows.length-1],sec=d.observedMs/1000;
+    const mib=x=>(x/1048576/sec).toFixed(2);
+    // Limit projection size without dropping any raw evidence.
+    const ranked=last.devices.map((dev,i)=>({dev:dev,i:i,total:d.totals[i]}))
+        .sort((a,b)=>(b.total[1]+b.total[4])-(a.total[1]+a.total[4])||a.i-b.i);
+    const lines=ranked.slice(0,8).map(o=>{
+        const a=o.total, inflight=Math.max(...rows.map(r=>r.devices[o.i][12]));
+        return o.dev[0]+" ["+o.dev[1]+":"+o.dev[2]+"]"
+            +"\nREAD / WRITE // "+mib(a[1])+" / "+mib(a[4])+" MiB/s"
+            +" | "+(a[0]/sec).toFixed(1)+" / "+(a[3]/sec).toFixed(1)+" IOPS"
+            +"\nIO MS / WEIGHTED MS // "+a[6]+" / "+a[7]+" | sampled peak in-flight "+inflight;
+    });
+    return "DISK I/O // "+rows.length+" intervals / "+last.devices.length+" devices / "+d.observedMs+" ms\n"
+        +lines.join("\n\n")+"\nTop "+Math.min(8,last.devices.length)+" by bytes; raw report retains all devices."
+        +" Device-backed whole block counters only; excludes virtual layers, partitions, discard and flush. Kernel time counters are not latency or saturation guarantees.";
 }

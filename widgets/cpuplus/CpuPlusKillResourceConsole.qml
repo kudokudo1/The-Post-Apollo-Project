@@ -11,6 +11,38 @@ Item {
     objectName: "cpuPlusKillResourceConsole"
     required property var target
     property bool selectionReady: false
+    // Projection of the existing left-side draft and shared limit owner.
+    property int memoryDraftPercent: -1
+    property real memoryMinimumMiB: 0
+    property real memoryMaximumMiB: 0
+    property real memoryCurrentPercent: 100
+    property bool memoryManaged: false
+    property bool memoryOwnerReady: false
+    property string memoryStatus: "LIMIT STATUS UNAVAILABLE"
+    signal memoryStageRequested(int percent)
+    signal memoryClearRequested()
+    signal memoryReviewRequested(int percent)
+    readonly property bool memoryEditable: selectionReady && memoryOwnerReady
+        && memoryMinimumMiB>0 && memoryMaximumMiB>=4*memoryMinimumMiB
+    readonly property bool memoryFiniteDraft: memoryDraftPercent>=0 && memoryDraftPercent<=97
+    readonly property bool memoryRestoreDraft: memoryDraftPercent===100
+    readonly property bool memoryCanReview: memoryEditable && selectedKey==="memory"
+        && Draft.summary(staged).length===0
+        && (memoryFiniteDraft || (memoryRestoreDraft && memoryManaged))
+    function memoryPreviewPercent() {
+        return memoryFiniteDraft ? memoryDraftPercent
+            : memoryManaged ? Math.max(0,Math.min(97,Math.round(memoryCurrentPercent))) : 50;
+    }
+    function memoryPreviewMiB(percent) {
+        return Math.round(memoryMinimumMiB + (memoryMaximumMiB-memoryMinimumMiB)*percent/98.5);
+    }
+    function memoryDraftLine() {
+        if (memoryDraftPercent<0) return "";
+        if (memoryRestoreDraft) return "MEMORY // RESTORE ORIGINAL";
+        if (memoryFiniteDraft) return "MEMORY // LIMIT "+memoryDraftPercent+"% OF CONTROL RANGE (~"+memoryPreviewMiB(memoryDraftPercent)+" MiB)";
+        return "MEMORY // LEGACY ENDPOINT DRAFT; SELECT LIMIT OR RESTORE AGAIN";
+    }
+    onMemoryDraftPercentChanged: reviewing = false
     property var resourceEvidence: null
     readonly property var exactEvidence: resourceEvidence && resourceEvidence.key===targetIdentity ? resourceEvidence : null
     readonly property var allowedCpuIds: Draft.cpuIds(exactEvidence ? exactEvidence.cpuMask : "")
@@ -64,7 +96,12 @@ Item {
     property bool informationOpen: false
     onSelectedKeyChanged: informationOpen = false
     property bool reviewing: false
-    readonly property var reviewLines: Draft.summary(staged)
+    readonly property var reviewLines: {
+        const lines=Draft.summary(staged);
+        const memory=memoryDraftLine();
+        if (memory) lines.push(memory);
+        return lines;
+    }
     readonly property bool hasDraft: reviewLines.length > 0
 
     function clearDraft() {
@@ -228,7 +265,9 @@ Item {
                 objectName: "cpuPlusResourceCapabilityStatus"
                 width: parent.width
                 height: 13
-                text: "CAPABILITY / WRITE PERMISSION // NOT VERIFIED"
+                text: root.selectedKey==="memory"
+                    ? "EXISTING LIMIT OWNER // CONFIRMATION REQUIRED"
+                    : "CAPABILITY / WRITE PERMISSION // NOT VERIFIED"
                 color: Colors.yellow
                 font.pixelSize: 9
                 elide: Text.ElideRight
@@ -277,7 +316,9 @@ Item {
                 }
                 GohuText {
                     width: parent.width
-                    text: "OFF / MANUAL / AUTO / HOLD ARE DRAFTS ONLY. "
+                    text: root.selectedKey==="memory"
+                        ? "RLIMIT_AS LIMITS VIRTUAL ADDRESS SPACE. RESTORE RETURNS THE ORIGINAL KILL-CAPTURED SOFT LIMIT. REVIEW AND CONFIRM THROUGH THE EXISTING OWNER."
+                        : "OFF / MANUAL / AUTO / HOLD ARE DRAFTS ONLY. "
                         + "APPLY REMAINS LOCKED UNTIL THE RESOURCE BACKEND IS VERIFIED."
                     color: Colors.yellow
                     wrapMode: Text.Wrap
@@ -375,7 +416,7 @@ Item {
                         spacing: 5
                             GohuText {
                                 width: parent.width
-                                visible: resourcePanel.spec.controls.length > 0
+                                visible: resourcePanel.key!=="memory" && resourcePanel.spec.controls.length > 0
                                 text: root.modeFor(resourcePanel.key) === "auto"
                                     ? "AUTO // POLICY NOT CONFIGURED; DRAFT ONLY"
                                     : root.modeFor(resourcePanel.key) === "off"
@@ -391,7 +432,7 @@ Item {
                             // slider, sharing its footprint instead of another
                             // menu row. A future dial occupies the same left slot.
                             Repeater {
-                                model: resourcePanel.spec.controls
+                                model: resourcePanel.key==="memory" ? [] : resourcePanel.spec.controls
                                 delegate: Column {
                                     id: field
                                     required property var modelData
@@ -567,6 +608,99 @@ Item {
                                             }
                                         }
                                     }
+                                }
+                            }
+                            Column {
+                                objectName: "cpuPlusSharedMemoryControls"
+                                width: parent.width
+                                visible: resourcePanel.key==="memory"
+                                spacing: 5
+                                GohuText {
+                                    width: parent.width
+                                    text: root.memoryStatus
+                                    color: Colors.magenta
+                                    wrapMode: Text.Wrap
+                                    font.pixelSize: 10
+                                }
+                                Row {
+                                    id: memoryRow
+                                    width: parent.width
+                                    height: 62
+                                    spacing: 5
+                                    CpuPlusDiagnosticSlider {
+                                        objectName: "cpuPlusSharedMemorySlider"
+                                        width: Math.max(1,memoryRow.width-memoryButtons.width-memoryRow.spacing)
+                                        height: 58
+                                        compact: true
+                                        title: "ADDRESS SPACE"
+                                        shortTitle: title
+                                        minimumValue: 0
+                                        maximumValue: 97
+                                        valueStep: 1
+                                        currentValue: root.memoryPreviewPercent()
+                                        readout: root.memoryRestoreDraft ? "RESTORE"
+                                            : root.memoryMinimumMiB>0 ? "~"+root.memoryPreviewMiB(currentValue)+" MiB" : "UNAVAILABLE"
+                                        subjectColor: Colors.magenta
+                                        fillColor: Colors.magenta
+                                        adjustable: root.memoryEditable
+                                        onValueRequested: function(value) {
+                                            if (root.memoryEditable)
+                                                root.memoryStageRequested(Math.round(value));
+                                        }
+                                    }
+                                    Column {
+                                        id: memoryButtons
+                                        width: Math.min(142,Math.max(102,memoryRow.width*0.45))
+                                        spacing: 3
+                                        ActionButton {
+                                            objectName: "cpuPlusMemorySetLimit"
+                                            width: parent.width
+                                            height: 28
+                                            normalFace: true
+                                            accentColor: Colors.magenta
+                                            label: "SET LIMIT"
+                                            selected: root.memoryFiniteDraft
+                                            available: root.memoryEditable
+                                            onLeftClicked: root.memoryStageRequested(root.memoryPreviewPercent())
+                                        }
+                                        ActionButton {
+                                            objectName: "cpuPlusMemoryRestore"
+                                            width: parent.width
+                                            height: 28
+                                            normalFace: true
+                                            accentColor: Colors.magenta
+                                            label: "RESTORE ORIGINAL"
+                                            labelPixelSize: 9
+                                            labelMinimumPixelSize: 7
+                                            selected: root.memoryRestoreDraft
+                                            available: root.memoryEditable && root.memoryManaged
+                                            onLeftClicked: root.memoryStageRequested(100)
+                                        }
+                                    }
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: root.memoryDraftLine() || "NO MEMORY DRAFT // SLIDER IS A PREVIEW"
+                                    color: Colors.white
+                                    wrapMode: Text.Wrap
+                                    font.pixelSize: 10
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: "RANGE "+root.memoryMinimumMiB+"–"+root.memoryPreviewMiB(97)
+                                        +" MiB (ESTIMATE) // VIRTUAL ADDRESS SPACE, NOT RSS"
+                                    color: Colors.yellow
+                                    wrapMode: Text.Wrap
+                                    font.pixelSize: 9
+                                    visible: root.memoryEditable
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: "OTHER RESOURCE DRAFTS MUST BE CLEARED BEFORE MEMORY APPLY"
+                                    color: Colors.yellow
+                                    wrapMode: Text.Wrap
+                                    font.pixelSize: 9
+                                    visible: Draft.summary(root.staged).length>0
                                 }
                             }
                             Loader {
@@ -797,7 +931,7 @@ Item {
                 normalFace: true
                 accentColor: Colors.red
                 available: root.selectionReady && root.hasDraft
-                onLeftClicked: root.clearDraft()
+                onLeftClicked: { root.clearDraft(); root.memoryClearRequested(); }
             }
             ActionButton {
                 objectName: "cpuPlusResourceReviewDraft"
@@ -835,6 +969,7 @@ Item {
         }
         ActionButton {
             objectName: "cpuPlusResourceApplyLocked"
+            visible: root.selectedKey!=="memory"
             width: parent.width
             height: 32
             label: "APPLY LOCKED // UNVERIFIED"
@@ -842,6 +977,20 @@ Item {
             normalFace: true
             accentColor: Colors.green
             available: false
+        }
+        ActionButton {
+            objectName: "cpuPlusMemoryApplyReview"
+            visible: root.selectedKey==="memory"
+            width: parent.width
+            height: 32
+            label: root.memoryCanReview
+                ? root.memoryRestoreDraft ? "RESTORE // REVIEW" : "APPLY LIMIT // REVIEW"
+                : "APPLY LOCKED // CHECK DRAFT"
+            labelPixelSize: 10
+            normalFace: true
+            accentColor: Colors.green
+            available: root.memoryCanReview
+            onLeftClicked: if (root.memoryCanReview) root.memoryReviewRequested(root.memoryDraftPercent)
         }
     }
 }

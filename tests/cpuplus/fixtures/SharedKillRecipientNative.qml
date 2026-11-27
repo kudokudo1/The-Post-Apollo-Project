@@ -557,6 +557,25 @@ ShellRoot {
                         && fakeGate.preparations===0 && fakeGate.confirmations===0,
                         "best effort reenables dial without dispatch")) return;
                 clearDraft.leftClicked(null);
+                memoryFilter.leftClicked(null);
+                const memorySlider=smoke.find(view,"cpuPlusSharedMemorySlider");
+                const memorySet=smoke.find(view,"cpuPlusMemorySetLimit");
+                const memoryRestore=smoke.find(view,"cpuPlusMemoryRestore");
+                const memoryApply=smoke.find(view,"cpuPlusMemoryApplyReview");
+                if (!smoke.check(memorySlider && memorySet && memoryRestore && memoryApply
+                        && !memoryRestore.available && !memoryApply.available && !consolePane.hasDraft,
+                        "memory editor opens without limit or restore draft")) return;
+                memorySlider.valueRequested(42);
+                if (!smoke.check(view.stagedLimitPercent===42 && memoryApply.available
+                        && consolePane.reviewLines[0].indexOf("42%")>=0
+                        && fakeGate.preparations===0 && fakeGate.confirmations===0,
+                        "right memory slider stages the existing shared draft")) return;
+                if (!smoke.check(!view.stageResourceMemory(98) && !view.stageResourceMemory(100)
+                        && view.stagedLimitPercent===42,
+                        "ambiguous cap endpoint and unowned restore refused")) return;
+                clearDraft.leftClicked(null);
+                if (!smoke.check(view.stagedLimitPercent===-1 && !memoryApply.available,
+                        "clear removes shared draft without owner dispatch")) return;
                 cpuFilter.leftClicked(null);
                 const header=smoke.find(view,"cpuPlusProcessIdentity");
                 const glyph=smoke.find(view,"cpuPlusProcessIdentityGlyph");

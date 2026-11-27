@@ -107,11 +107,19 @@ PanelWindow {
         fillOpacity: 0.95
         borderColor: root.prismBorderColor
         borderWidth: 1
+        borderVisible: false
         radius: 0
         glowVisible: false
 
-        // The thin white border is still the physical edge; the Prism
-        // spectrum overlays it and supplies the entire outer halo.
+        // SurfaceFrame's default border is above its content. Place one
+        // fixed white edge INSIDE that content instead, beneath the spectrum.
+        Rectangle {
+            anchors.fill: parent
+            color: "transparent"
+            border.width: 1
+            border.color: root.prismBorderColor
+            z: -1
+        }
         PrismBorderGlow {
             anchors.fill: parent
             z: 3

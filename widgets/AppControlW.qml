@@ -1072,16 +1072,18 @@ PanelWindow {
         refreshTimer: taskRefreshAfterKillTimer
     }
 
-    HunterExecutor {
-        id: hunterExecutor
+    readonly property var hunterExecutor: KillBackend.KillStore.hunterExecutor
 
-        onResultReady: function(result) {
+    Connections {
+        target: appControlWindow.hunterExecutor
+
+        function onResultReady(result) {
             appControlWindow.applyHunterOperationResult(result);
         }
 
-        onFinished: appControlWindow.finishHunterOperation()
+        function onFinished() { appControlWindow.finishHunterOperation(); }
 
-        onErrorRaised: function(message) {
+        function onErrorRaised(message) {
             console.log("AppControl: HUNTER", String(message || ""));
         }
     }

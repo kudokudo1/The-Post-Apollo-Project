@@ -16,8 +16,10 @@ step_shell = (ROOT / "SelectorStepTest.qml").read_text(encoding="utf-8")
 
 assert 'property bool horizontalStepPresentation: false' in slider
 assert 'readonly property bool horizontalStep: stepMode && horizontalStepPresentation' in slider
-assert 'topMargin: slider.horizontalStep ? 8 : 38' in slider
-assert 'bottomMargin: slider.horizontalStep ? 8 : 26' in slider
+assert 'property bool compactVerticalStep: false' in slider
+assert 'readonly property bool externalStepReadout: horizontalStep || (stepMode && compactVerticalStep)' in slider
+assert 'topMargin: slider.externalStepReadout ? 8 : 38' in slider
+assert 'bottomMargin: slider.externalStepReadout ? 8 : 26' in slider
 assert 'preventStealing: slider.horizontalStep' in slider
 assert 'if (!horizontalStep) { event.accepted = false; return; }' in slider
 assert 'property string selectorProfile: "index"' in slider

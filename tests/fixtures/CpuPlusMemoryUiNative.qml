@@ -329,7 +329,7 @@ ShellRoot {
                         const refresh=smoke.find(pane,"cpuplusWorkRefresh");
                         const controls=smoke.find(pane,["cpuplusProcBottomControls","cpuplusAutoBottomControls","cpuplusDiagBottomControls"][smoke.phase-2]);
                         if (!top || !bottom || !refresh || !controls) return;
-                        if (!smoke.check(top.visible && bottom.visible && (smoke.phase===3 ? controls.parent===smoke.find(pane,"cpuplusAutoSectionFooter") : controls.parent===bottom)
+                        if (!smoke.check(top.visible && bottom.visible && (smoke.phase===3 ? controls.parent===smoke.find(pane,"cpuplusAutoSectionFooter") : smoke.phase===4 ? controls.parent.parent===bottom : controls.parent===bottom)
                             && scroll.y>=top.y+top.height && scroll.y+scroll.height<=footer.y+1
                             && scroll.height>0,"fixed work rails and positive middle viewport")) return;
                         const y=controls.mapToItem(pane,0,0).y;

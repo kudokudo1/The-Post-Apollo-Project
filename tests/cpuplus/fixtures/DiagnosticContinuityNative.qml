@@ -55,14 +55,24 @@ ShellRoot {
         const rail=findItem(paneItem,"cpuplusWorkshopFilterRail");
         if(!band||!block||!target||!divider||!info||!host||!rail) return false;
         const pos=item=>item.mapToItem(paneItem,0,0);
+        const horizontal = Math.abs(pos(block).x-pos(band).x)<1
+            && Math.abs(pos(host).x+host.width-pos(band).x-band.width)<1
+            && pos(block).x+block.width+3<=pos(host).x
+            // Non-stacked status and selectors are independently centered,
+            // not forced to have identical heights or top edges.
+            && Math.abs((pos(block).y+block.height/2)
+                      -(pos(host).y+host.height/2))<1
+            && Math.abs(band.height-Math.max(block.height,host.height))<1;
+        const stacked = band.stacked===true
+            && Math.abs(pos(block).x-pos(band).x)<1
+            && pos(host).y>=pos(block).y+block.height+4-1
+            && pos(host).x>=pos(band).x
+            && pos(host).x+host.width<=pos(band).x+band.width+1
+            && pos(host).y+host.height<=pos(band).y+band.height+1;
         return target.visible && target.text.length>0 && rail.parent===host
             && pos(info).y+info.height<=pos(divider).y+1
             && pos(divider).y+divider.height<=pos(band).y+1
-            && Math.abs(pos(block).x-pos(band).x)<1
-            && Math.abs(pos(host).x+host.width-pos(band).x-band.width)<1
-            && pos(block).x+block.width<=pos(host).x
-            && (paneItem.subject==="SYSTEM" || Math.abs(pos(block).y-pos(host).y)<1)
-            && (paneItem.subject==="SYSTEM" ? block.height>=host.height && Math.abs(pos(block).y+block.height/2-pos(host).y-host.height/2)<1 : Math.abs(block.height-host.height)<1)
+            && (band.stacked ? stacked : horizontal)
             && Math.abs(rail.height-host.height)<1
             && Math.abs(rail.width-host.width)<1;
     }

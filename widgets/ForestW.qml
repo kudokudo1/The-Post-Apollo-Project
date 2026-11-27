@@ -1603,16 +1603,24 @@ PanelWindow {
                     spacing: root.frameHeight >= 540 ? 8 : 4
                     GohuText {
                         width: parent.width
-                        text: "NO ACTIVE SESSION"
+                        text: root.chatHostTrusted ? "CHAT COVERAGE UNKNOWN" : "CHAT HOST OFFLINE"
+                        textFormat: Text.PlainText
                         color: Colors.white
                         font.pixelSize: 15
+                        wrapMode: Text.WordWrap
                         horizontalAlignment: Text.AlignHCenter
                     }
                     GohuText {
                         width: parent.width
+                        // B0 inventory is independent of a qualified chat host.
                         text: localInventory.status === "REACHABLE"
-                            ? "MODEL LIST READY // CHAT HOST NOT CONNECTED"
-                            : "OLLAMA / HERMES ADAPTER NOT CONNECTED"
+                            ? "OLLAMA INVENTORY // READY"
+                            : localInventory.status === "CHECKING"
+                                ? "OLLAMA INVENTORY // SCANNING"
+                                : localInventory.status === "NOT_CHECKED"
+                                    ? "OLLAMA INVENTORY // NOT SCANNED"
+                                    : "OLLAMA INVENTORY // UNAVAILABLE"
+                        textFormat: Text.PlainText
                         color: Colors.orange
                         font.pixelSize: 10
                         wrapMode: Text.WordWrap
@@ -1623,7 +1631,8 @@ PanelWindow {
                         // not hide any active chat or personal conversation.
                         visible: root.frameHeight >= 540
                         width: parent.width
-                        text: "B1 / B2 / B3 READY AS CONTRACTS // TRUSTED HOST NOT CONNECTED"
+                        text: "LOCAL DRAFT ONLY // SEND LOCKED"
+                        textFormat: Text.PlainText
                         color: Colors.cyan
                         font.pixelSize: 10
                         wrapMode: Text.WordWrap

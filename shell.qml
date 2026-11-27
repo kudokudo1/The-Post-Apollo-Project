@@ -1642,9 +1642,22 @@ PanelWindow {
         cameraCleanupBusy: cameraWindow.busy
     }
 
-    // First real Prism mounting: an independent bottom-left button/module.
-    // This is a visual/selection preview, not a dictionary or popup yet.
-    PrismDock {}
+    // Prism remains a normal 50px bottom-left dock. Its open state is owned
+    // by one always-mapped, pointer-masked widget, like TASKS.
+    PrismDock {
+        id: prismDock
+        menuOpen: prismWindow.menuOpen
+        onToggleRequested: prismWindow.toggle()
+    }
+
+    PrismW {
+        id: prismWindow
+        screen: shellRoot.screen
+        // Reuse Trash's real vertical maximum rather than a new cap.
+        fullHeightReserve: trashWindow.fullHeightReserve
+        dockCenterX: 108 // 73px panel left + 10px face x + 25px half face
+        chassisTopY: 80   // Trash full frame begins below the 70px top bar
+    }
 
     // ===== POWER ================================================
 

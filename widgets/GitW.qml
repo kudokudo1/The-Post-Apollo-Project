@@ -3298,6 +3298,43 @@ PanelWindow {
         property bool redAccent: false
         // The action's identity is independent from its selection/fill state.
         property color actionAccentColor: Colors.cyan
+        // Operation-owned loading only; never change the control's colors.
+        property string operationKey: ""
+        property string operationPhase: "idle"
+        property double operationClock: 0
+        readonly property bool operationBusy: operationKey.length > 0
+            && gitService.actionBusy
+            && (gitService.pendingProcessAction === operationKey
+                || (operationKey === "pull"
+                    && gitService.pendingProcessAction === "track-checkout"))
+        readonly property bool operationQuiet: operationBusy
+            && gitService.actionLastActivityAt > 0
+            && operationClock - gitService.actionLastActivityAt >= 7000
+        onOperationBusyChanged: {
+            if (operationBusy) {
+                operationPhase = "running";
+                operationClock = Date.now();
+                operationResultHold.stop();
+            } else if (operationPhase === "running") {
+                // A finished Git process is not a verified success until
+                // its existing journal path reports a successful exit code.
+                operationPhase = gitService.actionExitCode === 0
+                    ? "success" : "failure";
+                operationResultHold.restart();
+            }
+        }
+        Timer {
+            interval: 400
+            repeat: true
+            running: gitAction.operationBusy && gitAction.visible && root.menuOpen
+            onTriggered: gitAction.operationClock = Date.now()
+        }
+        Timer {
+            id: operationResultHold
+            interval: 1600
+            repeat: false
+            onTriggered: gitAction.operationPhase = "idle"
+        }
 
         readonly property bool gitKeyboardSelector:
             root.gitKeyboardControl === gitAction
@@ -3431,6 +3468,18 @@ PanelWindow {
             id: gitArtwork
             anchors.fill: parent
             clip: true
+
+            EnergyProgressFace {
+                anchors.fill: parent
+                z: 0
+                variant: "omnitrix"
+                energyColor: gitAction.semanticAccent
+                chassisColor: gitAction.semanticAccent
+                phase: gitAction.operationPhase
+                progressMode: "indeterminate"
+                activityMotionEnabled: !gitAction.operationQuiet
+                visible: gitAction.operationPhase !== "idle"
+            }
 
             // Label-only actions shrink before falling back to a compact glyph.
             GohuText {
@@ -5744,6 +5793,7 @@ PanelWindow {
                                     anchors.verticalCenter: parent.verticalCenter
                                     anchors.verticalCenterOffset: 2
                                     label: "FETCH"
+                                    operationKey: "fetch"
                                     keyboardRow: 0
                                     enabledAction:
                                         gitService.repoIsLocal
@@ -5761,6 +5811,7 @@ PanelWindow {
                                         gitService.repoIsLocal
                                         ? "PULL"
                                         : "CLONE"
+                                    operationKey: gitService.repoIsLocal ? "pull" : "clone"
                                     keyboardRow: 0
                                     leftIcon: "◂"
                                     iconPixelSize: 29
@@ -5845,6 +5896,7 @@ PanelWindow {
                                         : gitService.selectedRemoteExists
                                           ? "PUSH"
                                           : "CREATE REMOTE"
+                                    operationKey: "push"
                                     keyboardRow: 0
                                     rightIcon:
                                         gitService.repoIsLocal

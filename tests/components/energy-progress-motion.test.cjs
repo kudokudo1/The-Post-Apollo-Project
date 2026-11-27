@@ -372,3 +372,33 @@ test("rocket fire has a round head and a tapered tail; exterior speed stays loca
     assert.match(source,/mix\(hotWhite,red,heat\*\.82\)/);
     assert.match(preview,/id: battlefieldLight\s+anchors.fill: parent\s+z: 10/);
 });
+
+test("TRON exterior streaks vary within a bounded head-relative region",()=>{
+    const a=currents.airFlow(2400,40,.28,false);
+    const b=currents.airFlow(2400,40,1.2,false);
+    assert.ok(new Set(a.map(l=>l.length)).size>10);
+    assert.ok(new Set(a.map(l=>l.y)).size>10);
+    assert.ok(JSON.stringify(a)!==JSON.stringify(b));
+    assert.equal(JSON.stringify(a),JSON.stringify(currents.airFlow(2400,40,.28,false)));
+    for(let t=0;t<5;t+=.013){
+        for(const l of currents.airFlow(2400,40,t,false)){
+            assert.ok(l.x>=-232-1e-9 && l.x+l.length<=1e-9);
+            assert.ok(Math.abs(l.y)>20 && Math.abs(l.y)<40);
+            assert.ok(l.alpha>=0&&l.alpha<=1);
+        }
+    }
+    assert.ok(currents.head("omnitrix",40,1,800).rx>36);
+});
+test("local light is shared and bounded; fire light follows the pixel silhouette",()=>{
+    const source=fs.readFileSync(path.join(root,"components/EnergyProgressFace.qml"),"utf8");
+    const preview=fs.readFileSync(path.join(root,"tests/fixtures/EnergyProgressPreview.qml"),"utf8");
+    const field=fs.readFileSync(path.join(root,"components/EnergyPressureField.qml"),"utf8");
+    assert.match(field,/property bool localLightingEnabled: true/);
+    assert.match(field,/localLights.sort\(.*\).slice\(0,8\)/);
+    assert.match(preview,/id: localRadiance\s+anchors.fill: parent\s+z: 11/);
+    assert.match(preview,/source.mapToItem\(localRadiance/);
+    assert.match(source,/Math.min\(\.\.\.pixel.cells.map/);
+    assert.match(source,/edge\+offset/);
+    assert.match(source,/const halo=c.createRadialGradient/);
+    assert.match(source,/heated.addColorStop\(0,tint\(Colors.yellow,.94\)\)/);
+});

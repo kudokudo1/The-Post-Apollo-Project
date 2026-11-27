@@ -44,8 +44,10 @@ PanelWindow {
     // Keep the idle diagnostic session referenced by the root, not a transient pane.
     readonly property var diagnosticSessionOwner: CpuPlusDiagnostics
     // Passive lifecycle observer; no capture is started by mounting the shell.
+    DiagnosticDumpResourceCapture { id: universalResources }
     DiagnosticWidgetLifecycleAdapter {
         id: universalLifecycle
+        resourceCapture: universalResources
         blocked: CpuPlusDiagnostics.busy || CpuPlusDiagnostics.faulted || CpuPlusDiagnostics.archiveBusy ||
             CpuPlusDiagnostics.workflowCatalogBusy || CpuPlusDiagnostics.setActive
         sources: ({
@@ -137,7 +139,7 @@ PanelWindow {
         id: syntagmaEventLoopProbe
         interval: 100
         repeat: true
-        running: shellRoot.syntagmaLagProbeEnabled || CpuPlusDiagnostics.appControlCaptureActive || CpuPlusDiagnostics.stallCaptureActive
+        running: shellRoot.syntagmaLagProbeEnabled || CpuPlusDiagnostics.appControlCaptureActive || CpuPlusDiagnostics.stallCaptureActive || universalLifecycle.observing
         property double previousTickMs: 0
 
         onRunningChanged: {
@@ -149,6 +151,8 @@ PanelWindow {
             const now = Date.now();
             const elapsed = now - previousTickMs;
             previousTickMs = now;
+            if (universalLifecycle.observing)
+                universalLifecycle.loopTick(elapsed,now);
             if (CpuPlusDiagnostics.stallCaptureActive)
                 CpuPlusDiagnostics.recordStallTick(now);
 

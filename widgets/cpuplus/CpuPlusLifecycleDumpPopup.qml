@@ -87,10 +87,10 @@ Controls.Popup {
         }
         GohuText {
             width: parent.width; height: 14
-            text: CpuPlusDiagnostics.lifecycleActive?"RECORDING // USE WIDGETS NORMALLY":
+            text: CpuPlusDiagnostics.lifecycleActive?(CpuPlusDiagnostics.lifecycleRecorder.finalizing?"FINALIZING // RESOURCE RECEIPT":"RECORDING // USE WIDGETS NORMALLY"):
                 CpuPlusDiagnostics.lifecycleReport ? CpuPlusDiagnostics.lifecycleReport.status+" // "+
                 (CpuPlusDiagnostics.lifecycleReport.stats?CpuPlusDiagnostics.lifecycleReport.stats.length+" WIDGETS / "+CpuPlusDiagnostics.lifecycleReport.events.length+" EVENTS":CpuPlusDiagnostics.lifecycleReport.reason):
-                "LIFECYCLE ONLY // CPU AND MEMORY PENDING"
+                "LIFECYCLE + SHELL CPU / MEMORY / STALL"
             color: CpuPlusDiagnostics.lifecycleActive?Colors.green:Colors.cyan
             font.pixelSize: 9; elide: Text.ElideRight
         }

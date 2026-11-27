@@ -94,8 +94,20 @@ ShellRoot {
                 const bars=header&&smoke.find(header,"cpuplusSharedLiveCapacityBars");
                 const divider=header&&smoke.find(header,"cpuplusSharedCapacityDivider");
                 if(!header||!title||!bars||!divider||divider.y===0)return;
+                // CAP keeps its original immediate header. DIAG now reserves
+                // an observation label and info control above that same header.
+                // Test actual non-overlap, not the retired global +6 offset.
+                const headerTop=header.mapToItem(pane,0,0).y;
+                const workHeader=smoke.find(pane,"cpuplusWorkHeader");
+                const info=pane.page==="DIAG"
+                    ?smoke.find(pane,"cpuplusMemoryDiagnosticsInfo"):null;
+                const placement=pane.page==="DIAG"
+                    ?!!(workHeader&&info&&info.visible
+                        &&Math.abs(workHeader.mapToItem(pane,0,0).y-(rail.y+rail.height)-6)<1
+                        &&headerTop>=info.mapToItem(pane,0,info.height).y+4)
+                    :Math.abs(headerTop-(rail.y+rail.height)-6)<1;
                 if(!smoke.check(header.visible && title.height===25 && header.spacing===5 && divider.height===1
-                    && Math.abs(header.mapToItem(pane,0,0).y-(rail.y+rail.height)-6)<1
+                    && placement
                     && Math.abs(bars.y-title.y-title.height-5)<1
                     && Math.abs(divider.y-bars.y-bars.height-5)<1,"shared CAP header geometry "+pane.page))return;
                 if (smoke.phase === 0) {

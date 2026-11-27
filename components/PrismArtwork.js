@@ -9,7 +9,7 @@ function prismGeometry() {
         spectrumIndices:[0,0,1,2,3,3,4,5,6,6] };
 }
 
-function paint(ctx, pixelWidth, pixelHeight, faceWidth, faceHeight, padding, borderWidth, palette, strength) {
+function paint(ctx, pixelWidth, pixelHeight, faceWidth, faceHeight, padding, borderWidth, palette, strength, glowOnly=false) {
     // Render one bounded, antialiased texture; no sampled scene items or animation.
     const g=prismGeometry(), w=pixelWidth, h=pixelHeight;
     const W=faceWidth+2*padding, H=faceHeight+2*padding;
@@ -61,6 +61,15 @@ function paint(ctx, pixelWidth, pixelHeight, faceWidth, faceHeight, padding, bor
                              -Math.max(-.5,Math.min(.5,fy/faceHeight))/2);
             const d=Math.hypot(ox,oy)/unit;
             over(spectrum(t),glow*(.48*gaussian(d,1.6)+.22*gaussian(d,4.8))*(1-smooth(7,9,d)));
+        } else if(glowOnly && (Math.abs(fx)>=faceWidth/2-borderWidth
+                   || Math.abs(fy)>=faceHeight/2-borderWidth)) {
+            // Spectral light sits over the ONE native white border, never
+            // another border stroke. The glow can tint but not thicken it.
+            const t=clamp(.5+Math.max(-.5,Math.min(.5,fx/faceWidth))/2
+                             -Math.max(-.5,Math.min(.5,fy/faceHeight))/2);
+            const d=Math.min(faceWidth/2-Math.abs(fx),
+                             faceHeight/2-Math.abs(fy))/unit;
+            over(spectrum(t),glow*.35*gaussian(d,1.6));
         } else if(Math.abs(fx)<faceWidth/2-borderWidth && Math.abs(fy)<faceHeight/2-borderWidth) {
             const x=fx/unit+103/2.4,y=fy/unit+40;
             const lx=(51*(x-43)+25*(y-14))/sideLength;
@@ -73,7 +82,7 @@ function paint(ctx, pixelWidth, pixelHeight, faceWidth, faceHeight, padding, bor
             over(triangleColor,glow*(1-triCover)*(.12*gaussian(td,8)+.14*gaussian(td,3)));
             // White wash is the dominant material identity, not a spectral fill.
             const wash=.48+(.12-.48)*clamp((y-14)/51);
-            over(mix(mix(black,white,.035),white,wash),triCover);
+            if (!glowOnly) over(mix(mix(black,white,.035),white,wash),triCover);
             // Full white beam luminosity on BOTH sides of the entrance; only its core is interrupted.
             const distances=[dist(x,y,incoming,j),...ends.map(e=>dist(x,y,j,e))];
             for(let i=1;i<4;i++) {
@@ -81,7 +90,8 @@ function paint(ctx, pixelWidth, pixelHeight, faceWidth, faceHeight, padding, bor
                 over(beamColors[i],glow*(.23*gaussian(d,10)+.32*gaussian(d,3.4)));
             }
             over(white,glow*(.23*gaussian(distances[0],10)+.32*gaussian(distances[0],3.4)));
-            over(white,1-smooth(g.outlineWidth/2-aa/2,g.outlineWidth/2+aa/2,td));
+            if (!glowOnly) {
+                over(white,1-smooth(g.outlineWidth/2-aa/2,g.outlineWidth/2+aa/2,td));
             // Vertical start/end clipping; surface gap parallel to the left face.
             const cover=i=>{
                 const normal=Math.abs(-(x-j[0])*sines[i]+(y-j[1])*cosines[i]);
@@ -102,6 +112,7 @@ function paint(ctx, pixelWidth, pixelHeight, faceWidth, faceHeight, padding, bor
                 const nucleus=mix(white,nodeSpectrum(dy),smooth(-1.7,2.2,dx));
                 over(nucleus,.98*(1-smooth(g.nodeRadius-1.1-aa/2,g.nodeRadius+aa/2,d)));
             }
+            } // Original glass, cores, and nucleus are painted only once.
         }
         const at=(row*w+col)*4, a=p[3];
         data[at]=a>0?Math.round(clamp(p[0]/a)*255):0;

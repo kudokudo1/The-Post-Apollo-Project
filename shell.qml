@@ -46,7 +46,9 @@ PanelWindow {
     Binding {
         target: CpuPlusDiagnostics
         property: "appControlMode"
-        value: !appControlWindow.menuOpen ? "closed"
+        value: cpuPlusWindow.menuOpen && appControlWindow.menuOpen ? "mixed"
+            : cpuPlusWindow.menuOpen ? (cpuPlusWindow.selectedModeIndex === 1 ? "cpu-kill" : "other")
+            : !appControlWindow.menuOpen ? "closed"
             : appControlWindow.selectedModeIndex === appControlWindow.appsModeIndex ? "app"
             : appControlWindow.selectedModeIndex === appControlWindow.killModeIndex ? "kill" : "other"
     }

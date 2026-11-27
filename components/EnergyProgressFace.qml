@@ -173,7 +173,7 @@ Item {
                 const inset=root.track.inset, fx=x+inset, fy=y+inset;
                 const inner=root.track.width, fillHeight=root.track.height, edge=x+root.headCenterX;
                 const ink=root.phase==="failure" && root.variant!=="ki-blast" ? Colors.red : root.energyColor;
-                // Flat baseline: no radial gradients, external spill, or head.
+                // Quiet baseline: only a tiny fill-local leading highlight.
                 if(root.variant==="default") {
                     c.fillStyle=Colors.dark;
                     c.fillRect(x,y,w,h);
@@ -187,6 +187,21 @@ Item {
                         fill.addColorStop(1,Qt.rgba(ink.r*.60,ink.g*.60,ink.b*.60,1));
                         c.fillStyle=fill;
                         c.fillRect(fx,fy,inner*p,fillHeight);
+                        if(root.phase==="running" || (root.phase==="success" && elapsed<.42)) {
+                            const span=Math.min(inner*p,h*1.25);
+                            if(span>0) {
+                                const active=c.createLinearGradient(edge-span,mid,edge,mid);
+                                active.addColorStop(0,Qt.rgba(ink.r,ink.g,ink.b,0));
+                                active.addColorStop(.65,Qt.rgba(ink.r,ink.g,ink.b,.07));
+                                active.addColorStop(1,Qt.rgba(ink.r,ink.g,ink.b,.19));
+                                c.fillStyle=active; c.fillRect(edge-span,fy,span,fillHeight);
+                                const cap=Math.min(span,Math.max(1,h*.13));
+                                const tip=c.createLinearGradient(edge-cap,mid,edge,mid);
+                                tip.addColorStop(0,Qt.rgba(1,1,1,0));
+                                tip.addColorStop(1,Qt.rgba(ink.r*.7+.3,ink.g*.7+.3,ink.b*.7+.3,.15));
+                                c.fillStyle=tip; c.fillRect(edge-cap,fy,cap,fillHeight);
+                            }
+                        }
                     }
                     return;
                 }
@@ -384,19 +399,25 @@ Item {
                     const pixel=root.flamePixels;
                     // Heat penetrates the material ahead of the flame.
                     // Keep the already eroded/ashed region unchanged.
-                    const contactWidth=Math.min(fx+inner-edge,h*1.85+root.flameTipOffset);
+                    const bed=Material.heatBed(root.elapsed,root.flameSpeed,root.reducedMotion);
+                    const contactWidth=Math.min(fx+inner-edge,(h*1.85+root.flameTipOffset)*bed.reach);
                     if(contactWidth>0) {
                         c.save(); c.beginPath(); c.rect(edge,fy,contactWidth,fillHeight); c.clip();
                         const heated=c.createLinearGradient(edge,mid,edge+contactWidth,mid);
-                        heated.addColorStop(0,tint(Colors.yellow,.94));
-                        heated.addColorStop(.23,tint(Colors.orange,.77));
-                        heated.addColorStop(.64,tint(Colors.red,.36));
+                        heated.addColorStop(0,tint(Colors.yellow,.94*bed.pulse));
+                        heated.addColorStop(.23,tint(Colors.orange,.77*bed.pulse));
+                        heated.addColorStop(.64,tint(Colors.red,.36*bed.pulse));
                         heated.addColorStop(1,tint(Colors.red,0));
                         c.fillStyle=heated; c.fillRect(edge,fy,contactWidth,fillHeight);
-                        for(let i=0;i<6;i++){
-                            const yy=fy+1+i*Math.max(0,fillHeight-2)/5;
-                            c.fillStyle=tint(Colors.yellow,.25);
-                            c.fillRect(edge,yy,contactWidth*(.22+.28*(i%3)),1);
+                        for(const row of bed.rows) {
+                            const yy=fy+row.y*fillHeight;
+                            const start=edge+contactWidth*row.shift;
+                            const length=contactWidth*row.reach;
+                            const wave=c.createLinearGradient(start,yy,start+length,yy);
+                            wave.addColorStop(0,tint(Colors.yellow,row.alpha*bed.pulse));
+                            wave.addColorStop(.40,tint(Colors.orange,row.alpha*.82));
+                            wave.addColorStop(1,tint(Colors.red,0));
+                            c.fillStyle=wave; c.fillRect(start,yy,length,Math.max(1,fillHeight*.065));
                         }
                         c.restore();
                     }
@@ -406,6 +427,22 @@ Item {
                     const tip=edge+root.flameTipOffset;
                     fireHalo(tip-h*(.36+flame.drag),mid+h*(.20+flame.sway),
                         h*1.48*flame.stretch,h*1.08*flame.breath,.28*flame.pulse);
+                    // Live heat reflected on the retained material behind the front.
+                    // Burn Away has no material here, so never repaint it.
+                    if(!material.erosion && inner*p>0) {
+                        const span=Math.min(inner*p,h*(1.1+flame.speed*.75)*bed.reach);
+                        c.save(); c.beginPath(); c.rect(fx,fy,inner*p,fillHeight); c.clip();
+                        for(const row of bed.rows) {
+                            const yy=fy+row.y*fillHeight;
+                            const left=edge-span*row.reach;
+                            const g=c.createLinearGradient(left,yy,edge,yy);
+                            g.addColorStop(0,tint(Colors.red,0));
+                            g.addColorStop(.55,tint(Colors.orange,row.alpha*.55));
+                            g.addColorStop(1,tint(Colors.yellow,row.alpha*bed.pulse));
+                            c.fillStyle=g; c.fillRect(left,yy,edge-left,Math.max(1,fillHeight*.075));
+                        }
+                        c.restore();
+                    }
                     // Rocket exhaust: tapered back from the round head, hot
                     // inner core and softer outer plume. The material modes
                     // keep a shorter, localized combustion wake.

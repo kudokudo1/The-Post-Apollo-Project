@@ -65,7 +65,9 @@ assert.equal(policy.summarize("census",jsonl([sample,{...end,samples:2}])),null)
 assert.equal(policy.summarize("census",jsonl([{...sample,sequence:2},end])),null);
 assert.equal(policy.summarize("census",jsonl([{...sample,rows:[{...censusRow,writeBps:-1}]},end])),null);
 assert.match(policy.summarize("census",jsonl([{...sample,coverage:{truncated:true}},end])), /SCAN LIMIT REACHED/);
-assert.match(ui,/PROCESS CENSUS \/\/ 30s/);
+// QUICK labels are supplied by durable catalog rows, not the retired fixed list.
+assert.match(ui,/modelData.name\+\(modelData.execution==="configured"/);
+assert.match(ui,/modelData.kind==="appcontrol"\?" \/\/ 30s"/);
 
 const archived = {kind:"memory",id:"session-abc-def-1",status:"COMPLETE",summary:"summary",text:"raw",finishedAt:"2026-11-24T12:00:00.000Z"};
 const document = {schema:"post-apollo-diagnostic-archive-v1",rows:[archived],savedId:archived.id};

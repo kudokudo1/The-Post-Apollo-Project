@@ -7,7 +7,9 @@ QtObject {
     required property var telemetry
     required property var hunterPresentation
     property var taskRows: []
-    readonly property var miniTaskLookup: buildMiniTaskLookup(taskRows)
+    property var sharedMiniController: null
+    readonly property var miniTaskLookup: sharedMiniController
+        ? sharedMiniController.miniTaskLookup : buildMiniTaskLookup(taskRows)
 
     signal prepareCpuMemAppend()
     signal prepareCombiAppend()

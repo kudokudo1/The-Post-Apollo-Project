@@ -26,7 +26,7 @@ Scope {
     function selectComparison(side, reportId) {
         if (archiveBusy || archiveStatus !== "READY") return false;
         const row = archiveRows.find(item => item.id === reportId);
-        if (!row || row.status !== "COMPLETE" || ["workflow","stall","hostcpu","gpu","diskio","swapio","netio"].includes(row.kind)) return false;
+        if (!row || row.status !== "COMPLETE" || ["workflow","stall","hostcpu","gpu","diskio","swapio","netio","dump"].includes(row.kind)) return false;
         if (side === "before") compareBeforeId = row.id;
         else if (side === "after") compareAfterId = row.id;
         else return false;
@@ -57,6 +57,12 @@ Scope {
     readonly property bool workflowCatalogReady: workflowStore.ready
     readonly property bool workflowCatalogBusy: workflowStore.busy
     property var lifecycleRecorder: null
+    property string lifecycleCaptureId: ""
+    property string lifecycleArchiveFeedback: ""
+    Connections {
+        target: owner.lifecycleRecorder
+        function onCompleted(result) { owner.publishLifecycleReport(result); }
+    }
     readonly property bool lifecycleAvailable: lifecycleRecorder!==null
     readonly property bool lifecycleActive: lifecycleAvailable && lifecycleRecorder.active
     readonly property var lifecycleReport: lifecycleAvailable ? lifecycleRecorder.report : null
@@ -76,7 +82,29 @@ Scope {
         if(!lifecycleAvailable||workshopPresetLocked||worker.running)return false;
         if(!lifecycleRecorder.start(lifecycleSelection,lifecycleDurationSeconds*1000))return false;
         captureSequence+=1;
+        lifecycleCaptureId=sessionTag+"-"+captureSequence;
+        lifecycleArchiveFeedback="";
+        selectLatest("dump");
         return true;
+    }
+    function publishLifecycleReport(result) {
+        if(!lifecycleCaptureId)return false;
+        const id=lifecycleCaptureId;
+        lifecycleCaptureId="";
+        let text=JSON.stringify(result);
+        let verified=Policy.dumpEvidence(text);
+        if(!verified){
+            text=JSON.stringify({schema:"post-apollo-widget-lifecycle-v1",status:"FAILED",reason:"INVALID TERMINAL WITNESS"});
+            verified=Policy.dumpEvidence(text);
+        }
+        const record={id:id,status:Policy.dumpArchiveStatus(verified),summary:Policy.dumpSummary(verified),
+            text:text,finishedAt:new Date().toISOString()};
+        reports=Object.assign({},reports,{dump:record});
+        const accepted=archive.invoke({action:"save",record:Object.assign({kind:"dump"},record)});
+        lifecycleArchiveFeedback=accepted?"ARCHIVING // WAIT FOR RECEIPT":"ARCHIVE NOT CONFIRMED // SESSION ONLY";
+        feedback=record.status+" // DUMP";
+        captureFinished("dump",id);
+        return accepted;
     }
     function lifecyclePlan() {
         return {durationSeconds:lifecycleDurationSeconds,targets:lifecycleSelection.slice()};

@@ -45,11 +45,19 @@ function frame(phase, mode, progress, seconds, finishFrom, reduced, variant) {
     const impact = phase === "success" && !reduced
         ? smooth((t-.42)/.08)*(1-smooth((t-.50)/.34)) : 0;
     const clash=ki && (running || (phase==="success" && p<1)
-        || (defeated && !reduced && t<.84));
+        || (defeated && !reduced && t<1.08));
+    // The enemy already carries a little red while fighting. Defeat makes
+    // that heat spread continuously as the collision retreats to the origin.
+    const redBase=.12+.06*(1-(defeated?clamp(finishFrom,0,1):p));
+    const enemyHeat=ki && (clash || defeated)
+        ? (defeated ? redBase+(1-redBase)*(reduced?1:smooth(t/.72)) : redBase) : 0;
+    // Briefly hold the winning red blast at the origin, then extinguish it.
+    const enemyOpacity=clash ? (defeated ? 1-smooth((t-.84)/.24) : 1) : 0;
     return {
         fraction: p, intensity: strength,
         clash:clash, enemyFraction:clash?1-p:0,
-        defeat: defeated && !reduced ? (1-smooth(t/.84)) : 0,
+        enemyHeat:enemyHeat, enemyOpacity:enemyOpacity,
+        defeat: defeated && !reduced ? (1-smooth(t/1.08)) : 0,
         power: 1+strength*.85+pulse*(1+strength)+impact*.65,
         brightness: 1+strength*1.15+impact*.7,
         dx: running && !reduced ? (Math.sin(t*39)+.4*Math.sin(t*19))*(.35+strength*.85) : 0,

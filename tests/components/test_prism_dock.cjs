@@ -13,7 +13,8 @@ test("Prism uses the existing visual button as a standalone dock module",()=>{
     assert.match(dock,/objectName: "postApolloPrismButton"/);
     assert.match(dock,/selected: prismDock.previewSelected/);
     assert.match(dock,/onLeftClicked: prismDock.previewSelected = !prismDock.previewSelected/);
-    assert.match(shell,/PrismDock\s*\{\}/);\n    assert.ok(shell.indexOf("PrismDock {}") > shell.indexOf("id: trashWindow"));
+    assert.match(shell,/PrismDock\s*\{\}/);
+    assert.ok(shell.indexOf("PrismDock {}") > shell.indexOf("id: trashWindow"));
 });
 test("Prism sits right of Trash without modifying Trash's button",()=>{
     assert.match(trash,/margins\s*\{\s*top: 0\s*bottom: 10\s*left: 10/);

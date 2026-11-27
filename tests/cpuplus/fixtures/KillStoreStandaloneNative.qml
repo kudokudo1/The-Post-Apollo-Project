@@ -144,7 +144,10 @@ ShellRoot {
     function verifyStore() {
         const sample = [{_taskRecord: true, pid: 4321, startTicks: 98765,
             comm: "synthetic", cpuInstant: 31, rss: 2048, mem: 3, elapsed: "00:05"}];
-        first.store.graphVisible = true;
+        first.store.cpuVisible = true;
+        const cpuGraphDemand = first.store.graphVisible
+            && first.graphState.taskMiniHistoryKeepImmutable
+            && !first.store.donorGraphVisible;
         // Exercise the real signal route with no donor attached, no probe.
         first.store.telemetry.snapshotReady(sample);
         const next = [{_taskRecord: true, pid: 4321, startTicks: 98765,
@@ -155,6 +158,12 @@ ShellRoot {
         first.store.cpuVisible=true;
         const cpuCadence=first.store.snapshotInterval===600 && first.store.miniProbeNeeded;
         first.store.cpuVisible=false;
+        const idleGraphDemand = !first.store.graphVisible
+            && !first.graphState.taskMiniHistoryKeepImmutable;
+        first.store.donorGraphVisible=true;
+        const donorGraphDemand = first.store.graphVisible
+            && first.graphState.taskMiniHistoryKeepImmutable;
+        first.store.donorGraphVisible=false;
         first.store.donorResourceVisible=true;
         const resourceCadence=first.store.snapshotInterval===900 && !first.store.miniProbeNeeded;
         first.store.donorResourceVisible=false;
@@ -164,6 +173,7 @@ ShellRoot {
         first.store.donorFavoritesVisible=false;
         first.store.donorCombiVisible=false;
         if (!verifyActionGateway() || !verifyControlCustody() || !verifySession() || !cpuCadence || !resourceCadence || !combiCadence
+                || !cpuGraphDemand || !idleGraphDemand || !donorGraphDemand
                 || first.store.collectionEnabled || first.store !== second.store
                 || first.store.telemetry !== second.store.telemetry
                 || first.graphState !== second.graphState

@@ -855,8 +855,8 @@ test('combined score detail history translates a shared trace layer, not individ
     assert.match(trace,/opacity:\s*0\.10/,'fill appearance unchanged');
     assert.match(trace,/opacity:\s*0\.20/,'soft trace appearance unchanged');
     assert.match(trace,/opacity:\s*1\.0/,'bright trace appearance unchanged');
-    assert.equal((trace.match(/model:\\s*taskCombiScoreCanvas\\.graphPoints\\.length/g)||[]).length,1,
+    assert.equal(trace.split('model: taskCombiScoreCanvas.graphPoints.length').length-1,1,
         'one fill for each retained point');
-    assert.equal((trace.match(/taskCombiScoreCanvas\\.graphPoints\\.length - 1/g)||[]).length,1,
+    assert.equal(trace.split('taskCombiScoreCanvas.graphPoints.length - 1').length-1,1,
         'original line count remains one less than the point count');
 });

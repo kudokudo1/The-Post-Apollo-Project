@@ -24,6 +24,9 @@ PanelWindow {
     property int fullHeightReserve: 165
     property real dockCenterX: 108
     property real chassisTopY: 80
+    // Trash panel's bottom is 90 + 10 - 15 = 85px above the screen.
+    // Anchor Prism to that same baseline, growing upward at every size.
+    readonly property int frameBottomClearance: Math.max(0, fullHeightReserve - chassisTopY)
 
     readonly property int glowGutter: 12
     readonly property int frameTopInset: 9
@@ -55,15 +58,13 @@ PanelWindow {
     implicitHeight: frameHeight + frameTopInset + bottomScreenGap
 
     anchors {
-        top: true
-        bottom: false
+        top: false
+        bottom: true
         left: true
         right: false
     }
     margins {
-        top: TasksChassisPolicy.topMargin(
-            root.chassisTopY, root.usableScreenHeight,
-            root.implicitHeight, root.frameTopInset)
+        bottom: Math.max(0, root.frameBottomClearance - root.bottomScreenGap)
         left: TasksChassisPolicy.leftMargin(
             root.dockCenterX,
             root.screen ? root.screen.width : root.implicitWidth,
@@ -90,9 +91,10 @@ PanelWindow {
     WindowPanelFrame {
         id: prismFrame
         objectName: "prismWidgetFrame"
-        anchors.fill: parent
-        anchors.margins: root.glowGutter
-        anchors.topMargin: root.frameTopInset
+        x: root.glowGutter
+        y: root.frameTopInset
+        width: root.frameWidth
+        height: root.frameHeight
         visible: root.menuOpen
         focus: root.menuOpen
         Keys.onEscapePressed: function(event) {
@@ -106,98 +108,88 @@ PanelWindow {
         borderColor: root.prismBorderColor
         borderWidth: 1
         radius: 0
-        glowVisible: root.menuOpen
-        glowColor: root.prismBorderColor
+        glowVisible: false
+
+        // The thin white border is still the physical edge; the Prism
+        // spectrum overlays it and supplies the entire outer halo.
+        PrismBorderGlow {
+            anchors.fill: parent
+            z: 3
+        }
 
         Rectangle {
             id: prismHeader
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
-            // Two rows preserve legibility at TASKS' narrow portrait sizes.
-            // The upper row is the title and close; the lower row is the
-            // ordinary controls family and a source label, NOT a live poll.
-            height: 84
+            height: 40
             color: "transparent"
 
             GohuText {
                 anchors.left: parent.left
-                anchors.leftMargin: 14
-                anchors.right: closePrismButton.left
-                anchors.rightMargin: 8
-                anchors.verticalCenter: closePrismButton.verticalCenter
-                text: "PRISM // POST APOLLO"
-                font.pixelSize: 17
+                anchors.leftMargin: 8
+                anchors.right: prismToolbar.left
+                anchors.rightMargin: 5
+                anchors.verticalCenter: parent.verticalCenter
+                text: width >= 145 ? "PRISM // POST APOLLO" : "PRISM"
+                font.pixelSize: width >= 145 ? 14 : 12
                 font.bold: true
                 color: root.prismBorderColor
                 elide: Text.ElideRight
             }
 
-            CloseButton {
-                id: closePrismButton
-                anchors.right: parent.right
-                anchors.rightMargin: 10
-                anchors.top: parent.top
-                anchors.topMargin: 5
-                Accessible.name: "Close Prism widget"
-                onCloseRequested: root.menuOpen = false
-            }
-
+            // Exact operator order, starting at the right edge.
             Row {
                 id: prismToolbar
-                anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.leftMargin: 12
-                anchors.rightMargin: 12
-                anchors.top: parent.top
-                anchors.topMargin: 45
-                height: 28
-                spacing: 5
+                anchors.rightMargin: 7
+                anchors.verticalCenter: parent.verticalCenter
+                layoutDirection: Qt.RightToLeft
+                spacing: 3
+                readonly property int controlWidth:
+                    Math.max(16, Math.min(28, Math.floor((prismHeader.width - 100) / 6)))
 
-                ResizeButton {
-                    id: collapsePrismButton
-                    width: 28
-                    direction: "down"
-                    available: root.chassisLevel !== "compact"
-                    onResizeRequested: function(delta) {
-                        if (delta === -1) root.collapseChassis();
-                    }
+                CloseButton {
+                    id: closePrismButton
+                    width: prismToolbar.controlWidth
+                    height: width
+                    softGlowEnabled: false
+                    wideGlowEnabled: false
+                    perimeterGlowEnabled: false
+                    Accessible.name: "Close Prism widget"
+                    onCloseRequested: root.menuOpen = false
+                    PrismBorderGlow { anchors.fill: parent }
                 }
-                ResizeButton {
-                    id: expandPrismButton
-                    width: 28
-                    direction: "up"
-                    available: root.chassisLevel !== "large"
-                    onResizeRequested: function(delta) {
-                        if (delta === 1) root.expandChassis();
-                    }
+                ReloadButton {
+                    id: prismReloadButton
+                    objectName: "prismReloadButton"
+                    width: prismToolbar.controlWidth
+                    height: width
+                    available: false
+                    unavailableOpacity: 0.80
+                    semanticColor: Colors.yellow
+                    hoverSurfaceColor: Colors.orange
+                    softGlowEnabled: false
+                    wideGlowEnabled: false
+                    perimeterGlowEnabled: false
+                    Accessible.name: "Reload Prism index not yet available"
+                    PrismBorderGlow { anchors.fill: parent; strength: 0.65 }
                 }
-
-                Item {
-                    width: Math.max(0, prismToolbar.width
-                        - collapsePrismButton.width - expandPrismButton.width
-                        - prismSourceIndicator.width - prismReloadButton.width
-                        - prismIndexButton.width - prismToolbar.spacing * 5)
-                    height: 1
-                }
-
-                // "Live indicator" location, but no fabricated liveness:
-                // this is only a static semantic-source identification badge.
                 Rectangle {
                     id: prismSourceIndicator
                     objectName: "prismSourceIndicator"
-                    width: Math.max(0, Math.min(126, prismToolbar.width
-                        - 28 - 28 - 30 - 38 - prismToolbar.spacing * 5))
-                    height: 27
+                    width: Math.max(0, Math.min(94, prismHeader.width
+                        - 5 * prismToolbar.controlWidth - prismToolbar.spacing * 5 - 45))
+                    height: prismToolbar.controlWidth
                     radius: 0
                     color: Colors.dark
                     border.width: 1
                     border.color: root.prismBorderColor
-
+                    PrismBorderGlow { anchors.fill: parent }
                     GohuText {
                         anchors.fill: parent
-                        anchors.leftMargin: 3
-                        anchors.rightMargin: 3
+                        anchors.leftMargin: 2
+                        anchors.rightMargin: 2
                         text: "COLOR // SYNTAGMA"
                         color: root.prismBorderColor
                         font.pixelSize: 9
@@ -206,31 +198,44 @@ PanelWindow {
                         elide: Text.ElideRight
                     }
                 }
-
-                // The standard ReloadButton stays visible but unavailable.
-                // No reload action or fabricated service is wired yet.
-                ReloadButton {
-                    id: prismReloadButton
-                    objectName: "prismReloadButton"
-                    width: 30
-                    height: 28
-                    available: false
-                    unavailableOpacity: 0.80
-                    semanticColor: Colors.yellow
-                    hoverSurfaceColor: Colors.orange
-                    Accessible.name: "Reload Prism index not yet available"
-                }
-
-                // The diagnostic control opens the real placement index.
-                // Selection follows the displayed index, not a fake scan.
                 DiagnosticsDockButton {
                     id: prismIndexButton
                     objectName: "prismIndexButton"
-                    width: 38
-                    height: 28
+                    width: prismToolbar.controlWidth
+                    height: width
                     diagnosticsOpen: root.indexOpen
+                    softGlowEnabled: false
+                    wideGlowEnabled: false
+                    perimeterGlowEnabled: false
                     Accessible.description: "Registered Prism locations index"
                     onToggleRequested: root.indexOpen = !root.indexOpen
+                    PrismBorderGlow { anchors.fill: parent }
+                }
+                ResizeButton {
+                    id: expandPrismButton
+                    width: prismToolbar.controlWidth
+                    direction: "up"
+                    available: root.chassisLevel !== "large"
+                    softGlowEnabled: false
+                    wideGlowEnabled: false
+                    perimeterGlowEnabled: false
+                    onResizeRequested: function(delta) {
+                        if (delta === 1) root.expandChassis();
+                    }
+                    PrismBorderGlow { anchors.fill: parent }
+                }
+                ResizeButton {
+                    id: collapsePrismButton
+                    width: prismToolbar.controlWidth
+                    direction: "down"
+                    available: root.chassisLevel !== "compact"
+                    softGlowEnabled: false
+                    wideGlowEnabled: false
+                    perimeterGlowEnabled: false
+                    onResizeRequested: function(delta) {
+                        if (delta === -1) root.collapseChassis();
+                    }
+                    PrismBorderGlow { anchors.fill: parent }
                 }
             }
         }
@@ -242,8 +247,9 @@ PanelWindow {
             anchors.leftMargin: 12
             anchors.right: parent.right
             anchors.rightMargin: 12
-            height: 2
+            height: 1
             color: root.prismBorderColor
+            PrismBorderGlow { anchors.fill: parent; divider: true }
         }
 
         Item {
@@ -322,6 +328,7 @@ PanelWindow {
                         width: parent.width
                         height: 1
                         color: root.prismBorderColor
+                        PrismBorderGlow { anchors.fill: parent; divider: true }
                     }
 
                     Repeater {
@@ -333,6 +340,7 @@ PanelWindow {
                             color: Colors.dark
                             border.width: 1
                             border.color: root.prismBorderColor
+                            PrismBorderGlow { anchors.fill: parent }
 
                             Column {
                                 anchors.fill: parent

@@ -1485,6 +1485,7 @@ Item {
                 anchors.fill: parent
                 anchors.margins: 6
                 target: workspace.currentTask
+                resourceEvidence: workspace.graphSession.resourceEvidence
                 selectionReady: workspace.active && workspace.exactTargetAvailable
                     && !workspace.legacyActionBlocked && !workspace.hasBulkReview
                     && !workspace.bulkOperation && !workspace.locallyPending

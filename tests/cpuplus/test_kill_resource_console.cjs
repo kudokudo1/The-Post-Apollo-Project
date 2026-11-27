@@ -4,14 +4,14 @@ const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
 const source=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceDraft.js"),"utf8");
-const draft=new Function(source+"\nreturn {cards,find,identity,stageMode,stageValue,mode,value,summary,priorityPresets,stagePriorityPreset,hasValue};")();
+const draft=new Function(source+"\nreturn {cards,find,identity,stageMode,stageValue,mode,value,summary,priorityPresets,stagePriorityPreset,hasValue,cpuIds,stageAffinity,affinitySelection,dropAffinity};")();
 test("K8d seven distinct resource categories without imaginary GPU/network actuators",()=>{
     const rows=draft.cards();
     assert.deepEqual(rows.map(x=>x.key),["cpu","memory","swap","disk","threads","gpu","network"]);
     assert.deepEqual(rows.find(x=>x.key==="gpu").controls,[]);
     assert.deepEqual(rows.find(x=>x.key==="network").controls,[]);
     assert.match(rows.find(x=>x.key==="memory").scope,/RLIMIT_AS/);
-    assert.match(rows.find(x=>x.key==="cpu").note,/NOT ENUMERATED/);
+    assert.match(rows.find(x=>x.key==="cpu").note,/CURRENT LEADER MASK/);
 });
 test("K8d exact process identity and draft-only mode/value validation",()=>{
     assert.equal(draft.identity({pid:1,startTicks:8,comm:"x"}),"");
@@ -209,4 +209,31 @@ test("K8e1a priority presets stage only explicit priority; quota is not implied"
     assert.ok(ui.includes('onLeftClicked: root.choosePriorityPreset(modelData.key)'));
     assert.ok(ui.includes('root.stageNumber("cpu","nice",Math.round(value))'));
     assert.ok(ui.includes('showInstrumentChassis: false'));
+});
+
+test("K8e2a CPU editor defaults to editable without creating a draft",()=>{
+    assert.equal(draft.mode({},"cpu"),"manual");
+    assert.equal(draft.mode({},"memory"),"hold");
+    assert.equal(draft.summary({}).length,0);
+    assert.equal(draft.hasValue({},"cpu","nice"),false);
+    const ui=fs.readFileSync(path.resolve(__dirname,"../../widgets/cpuplus/CpuPlusKillResourceConsole.qml"),"utf8");
+    assert.ok(ui.includes("currentValue: root.priorityValue()"));
+    assert.ok(ui.includes("NORMAL // PREVIEW"));
+});
+test("K8e2a sparse observed CPU masks only; never empty or out-of-mask",()=>{
+    const allowed=draft.cpuIds("0-2,8,11-12");
+    assert.deepEqual(allowed,[0,1,2,8,11,12]);
+    for(const invalid of ["","-","2-1","0,0","1-999999","abc","1,,2"])
+        assert.deepEqual(draft.cpuIds(invalid),[]);
+    assert.deepEqual(draft.affinitySelection({},allowed),allowed);
+    const previous=draft.stagePriorityPreset({},"background");
+    assert.equal(draft.stageAffinity(previous,allowed,[]),previous);
+    assert.equal(draft.stageAffinity(previous,allowed,[3]),previous);
+    assert.equal(draft.stageAffinity(previous,allowed,[8,8]),previous);
+    const next=draft.stageAffinity(previous,allowed,[12,8]);
+    assert.deepEqual(draft.affinitySelection(next,allowed),[8,12]);
+    assert.ok(draft.summary(next)[0].includes("AFFINITY 8,12"));
+    assert.equal(draft.value(draft.dropAffinity(next),"cpu","nice"),10);
+    assert.equal(draft.hasValue(draft.dropAffinity(next),"cpu","affinity"),false);
+    assert.equal(draft.summary(draft.dropAffinity(draft.stageAffinity({},allowed,[8]))).length,0);
 });

@@ -471,8 +471,7 @@ ShellRoot {
                 resourceInfo.leftClicked(null);
                 if (!smoke.check(!resourcePopup.visible,
                         "resource information button closes read-only help")) return;
-                manualMode.leftClicked(null);
-                if (!smoke.check(manualMode.selected && consolePane.modeFor("cpu")==="manual",
+                if (!smoke.check(manualMode.selected && consolePane.modeFor("cpu")==="manual" && !consolePane.hasDraft,
                         "inline MANUAL mode button stages only local draft state")) return;
                 const priorityRow=smoke.find(view,"cpuPlusResourceInstrumentRow-cpu-nice");
                 const priorityDial=smoke.find(priorityRow,"cpuPlusPriorityDial");
@@ -481,7 +480,7 @@ ShellRoot {
                 const normalPreset=smoke.find(priorityRow,"cpuPlusPriorityPreset-normal");
                 if (!smoke.check(priorityRow && priorityDial && presetColumn && backgroundPreset
                         && normalPreset && priorityDial.visible && presetColumn.visible
-                        && priorityDial.interactive && !normalPreset.selected
+                        && priorityDial.interactive && normalPreset.selected && !consolePane.hasDraft
                         && presetColumn.x>=priorityDial.x+priorityDial.width-1,
                         "CPU priority dial and presets share the same unboxed instrument row")) return;
                 backgroundPreset.leftClicked(null);
@@ -490,6 +489,26 @@ ShellRoot {
                         && fakeGate.preparations===0 && fakeGate.confirmations===0,
                         "priority preset stages only nice, not quota or kernel dispatch")) return;
                 priorityDial.valueRequested(9);
+                // Use the real session admission boundary with a sparse observed mask.
+                if (!smoke.check(fakeSession.accept({pid:3442,startTicks:967833,
+                        cpuPercent:12,memPercent:4,rssKiB:23456,rssObserved:true,
+                        ioRateBytes:0,ageSeconds:55,niceValue:0,cpuMask:"0,2,8"}),
+                        "selected identity admits priority and sparse affinity evidence")) return;
+                const affinityAll=smoke.find(view,"cpuPlusAffinityAll");
+                const affinityOne=smoke.find(view,"cpuPlusAffinityOne");
+                if (!smoke.check(affinityAll && affinityOne && consolePane.allowedCpuIds.join(",")==="0,2,8"
+                        && consolePane.selectedCpuIds.join(",")==="0,2,8",
+                        "affinity uses exact observed IDs rather than CPU count")) return;
+                affinityOne.leftClicked(null);
+                if (!smoke.check(consolePane.selectedCpuIds.join(",")==="0"
+                        && fakeGate.preparations===0 && fakeGate.confirmations===0,
+                        "one CPU is a draft-only selection")) return;
+                consolePane.toggleAffinity(0);
+                if (!smoke.check(consolePane.selectedCpuIds.join(",")==="0",
+                        "last allowed CPU cannot be deselected")) return;
+                affinityAll.leftClicked(null);
+                if (!smoke.check(consolePane.selectedCpuIds.join(",")==="0,2,8",
+                        "all allowed restores the observed mask in draft only")) return;
                 if (!smoke.check(consolePane.hasDraft && consolePane.reviewLines.length===1
                         && consolePane.reviewLines[0].indexOf("NICE 9")>=0
                         && fakeGate.preparations===0 && fakeGate.confirmations===0,

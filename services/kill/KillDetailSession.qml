@@ -14,6 +14,7 @@ Scope {
     property string cpuTarget: ""
     property string donorTarget: ""
     property bool ready: false
+    property var resourceEvidence: null
 
     function identity(row) {
         if (!row || row._taskRecord !== true) return "";
@@ -45,6 +46,7 @@ Scope {
     // the in-flight probe generation in the original telemetry implementation.
     function rebind() {
         if (!ready) return;
+        resourceEvidence = null;
         graph.clearDetailHistory();
         if (!currentEntry) return;
         graph.resetForSelection(currentEntry, graph.miniCpuHistory(currentEntry), true);
@@ -59,6 +61,9 @@ Scope {
                 || Number(sample.pid)!==Number(currentEntry.pid)
                 || Number(sample.startTicks)!==Number(currentEntry.startTicks)
                 || state.taskHistoryPid!==Number(currentEntry.pid)) return false;
+        // Same identity-bound selected-detail sample; no new collector.
+        resourceEvidence = {key:activeKey,niceValue:sample.niceValue === undefined ? null : sample.niceValue,
+            cpuMask:typeof sample.cpuMask === "string" ? sample.cpuMask : ""};
         graph.applyDetailProbe(sample,currentEntry);
         return true;
     }

@@ -54,8 +54,7 @@ ShellRoot {
                 console.error("PRISM_NATIVE_FAIL canvas center unpainted");
             else
                 console.info("PRISM_NATIVE_CANVAS_PAINTED");
-            const saved=canvas.save("/tmp/prism-render-canvas.png");
-            console.info("PRISM_NATIVE_CANVAS_SAVED",saved);
+            console.info("PRISM_NATIVE_PAINT_MS",canvas.lastPaintDurationMs);
             prism.grabToImage(function(result) {
                 console.info("PRISM_NATIVE_COMPOSITE",result.saveToFile("/tmp/prism-render-composite.png"));
                 console.info("PRISM_NATIVE_DONE");

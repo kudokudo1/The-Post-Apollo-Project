@@ -38,6 +38,32 @@ check("actual M4 pages accumulate with explicit continuation",()=>{
     assert.equal(done.messages[1].body,"Public reply\nsecond line 🌲");
     assert.equal(done.nextAfter,null);assert.equal(done.permissionGranted,false);
 });
+check("actual M4a next-page refusal clears original partial display",()=>{
+    const pages=JSON.parse(execFileSync("python3",["-B",path.join(__dirname,"ui2_m4_public_fixture.py"),"--corrupt-next"],{encoding:"utf8"}));
+    assert.equal(pages.length,2);
+    assert.deepEqual(pages[1],{refused:true});
+    const {requestId,after,limit,...view}=pages[0].ref;
+    const v={...view,viewKey:"local-m4a-refusal"};
+    const c=p.createController();
+    c.open(v,requestId,limit);
+    const first=c.receive(pages[0].frame,v);
+    assert.equal(first.state,"PARTIAL");
+    assert.equal(first.messages.length,1);
+    assert.equal(first.messages[0].body,"Public question");
+    assert.equal(first.request,null);
+    assert.equal(first.nextAfter,1);
+    const next=c.next(v,"fixture_request_002",1);
+    assert.equal(next.state,"PENDING");
+    assert.equal(next.request.after,1);
+    assert.equal(next.messages.length,1);
+    // The fixture observed a real producer refusal; caller maps it to the
+    // existing local reject path, never synthesizes a successful page.
+    const refused=c.reject();
+    empty(refused);
+    assert.equal(refused.reason,"HOST_REFUSED");
+    empty(c.observe(v));
+    empty(c.receive(pages[0].frame,v));
+});
 check("default closed",()=>empty(p.createController().observe(scope),"CLOSED"));
 check("no automatic request after partial",()=>{const c=partial();const o=c.observe(scope);assert.equal(o.request,null);assert.equal(o.nextAfter,2);});
 check("valid next page retains prior rows pending",()=>{const c=partial();const o=c.next(scope,id(2),2);assert.equal(o.messages.length,2);assert.equal(o.request.after,2);assert.equal(c.receive(frame(o.request,[row(3)],true),scope).messages.length,3);});

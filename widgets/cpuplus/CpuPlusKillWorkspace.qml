@@ -952,6 +952,83 @@ Item {
                     viewportHeight: actuatorScroll.height - 12
                 }
 
+                // Extra observed metrics use the donor's existing scene-graph
+                // renderer, not a second collector or a different chart engine.
+                Repeater {
+                    model: workspace.currentTask ? [
+                        {key:"rss", label:"RSS", unit:" MiB", accent:Colors.resourceColor("rss"), range:16, decimals:1},
+                        {key:"threads", label:"THREADS", unit:"", accent:Colors.resourceColor("threads"), range:4, decimals:0},
+                        {key:"io", label:"I/O", unit:" MiB/s", accent:Colors.cyan, range:0.25, decimals:2},
+                        {key:"age", label:"UPTIME", unit:" min", accent:Colors.resourceColor("uptime"), range:1, decimals:2}
+                    ] : []
+                    delegate: Item {
+                        id: extraMetric
+                        required property var modelData
+                        objectName: "cpuPlusDetailMetric-"+modelData.key
+                        width: parent.width
+                        height: 96
+                        readonly property var values: details.graphDataAvailable
+                            && history.taskExtraDetailHistories
+                            ? history.taskExtraDetailHistories[modelData.key] || [] : []
+                        GohuText {
+                            id: extraTitle
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            width: parent.width
+                            elide: Text.ElideRight
+                            text: extraMetric.modelData.label+" HISTORY  "+(extraMetric.values.length
+                                ? Number(extraMetric.values[extraMetric.values.length-1]).toFixed(extraMetric.modelData.decimals)+extraMetric.modelData.unit
+                                : "N/A")
+                            font.pixelSize: 12
+                            color: extraMetric.modelData.accent
+                            layer.enabled: true
+                            layer.effect: DropShadow {
+                                radius: 5; samples: 5; opacity: 0.34
+                                color: extraMetric.modelData.accent; transparentBorder: true
+                            }
+                        }
+                        Rectangle {
+                            id: extraFrame
+                            anchors.top: extraTitle.bottom
+                            anchors.topMargin: 5
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            color: Colors.black
+                            border.width: 1
+                            border.color: extraMetric.modelData.accent
+                            RectangularShadow {
+                                anchors.fill: parent
+                                anchors.margins: -4
+                                spread: 3
+                                z: -1
+                                opacity: 0.30
+                                color: extraMetric.modelData.accent
+                            }
+                            ProcessMiniGraph {
+                                objectName: "cpuPlusDetailGraph-"+extraMetric.modelData.key
+                                anchors.fill: parent
+                                anchors.margins: 4
+                                geometry: graphGeometry
+                                showingTask: workspace.active && details.graphDataAvailable
+                                taskIdentity: workspace.graphSession.activeKey
+                                historyRevision: history.taskHunterDetailHistoryRevision
+                                metricKey: extraMetric.modelData.key
+                                historyLimit: history.taskHistoryLimit
+                                scrollDuration: history.taskGraphScrollDuration
+                                graphRange: extraMetric.modelData.range
+                                accent: extraMetric.modelData.accent
+                                readHistory: function() {
+                                    return details.graphDataAvailable && history.taskExtraDetailHistories
+                                        ? history.taskExtraDetailHistories[extraMetric.modelData.key] || [] : [];
+                                }
+                                readMetricHistory: function(key) { return []; }
+                                metricRange: function(key) { return extraMetric.modelData.range; }
+                            }
+                        }
+                    }
+                }
+
                 Item {
                     id: limitLockSlot
                     objectName: "cpuPlusProcessLimitLockSlot"

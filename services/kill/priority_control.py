@@ -94,6 +94,8 @@ def execute(req):
             raise ValueError("priority permission evidence changed")
         if before["nice"] != expected:
             raise ValueError("external nice change")
+        if req.get("expectedSnapshot") != before:
+            raise ValueError("captured priority evidence changed")
         if target == expected:
             reply.update(state="unchanged", after=before, original=original)
             return reply

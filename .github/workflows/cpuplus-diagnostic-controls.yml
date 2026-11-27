@@ -42,6 +42,8 @@ on:
       - "scripts/cpuplus_diagnostic_workflow.py"
       - "tests/cpuplus/test_diagnostic_workflow.py"
       - "scripts/cpuplus_process_census.py"
+      - "scripts/cpuplus_gpu_observer.py"
+      - "tests/cpuplus/test_gpu_observer.py"
       - "scripts/cpuplus_host_cpu_observer.py"
       - "tests/cpuplus/test_host_cpu_observer.py"
       - "widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml"
@@ -74,6 +76,7 @@ jobs:
       - run: python3 -B tests/cpuplus/test_process_census.py
       - run: python3 -B tests/cpuplus/test_storage_observer.py
       - run: python3 -B tests/cpuplus/test_host_cpu_observer.py
+      - run: python3 -B tests/cpuplus/test_gpu_observer.py
       - run: python3 -B tests/cpuplus/test_diagnostic_archive.py
       - run: python3 -B tests/components/test_syntagma_quickshell_thread_sampler.py
   native-continuity:

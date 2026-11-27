@@ -440,7 +440,7 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     const c=vm.createContext({});
     vm.runInContext(read("services/diagnostics/DiagnosticCalibration.js"),c);
     assert.equal(vm.runInContext('JSON.stringify(workshopSubjectKinds("CPU"))',c),'["threads","census","hostcpu"]');
-    assert.equal(vm.runInContext('workshopSubjectKinds("GPU").length',c),0);
+    assert.equal(vm.runInContext('JSON.stringify(workshopSubjectKinds("GPU"))',c),'["gpu"]');
     assert.equal(vm.runInContext('workshopPlanMatchesSubject({durationSeconds:30,instruments:[{kind:"census",intervalMs:10000}]},"CPU")',c),true);
     assert.equal(vm.runInContext('workshopPlanMatchesSubject({durationSeconds:30,instruments:[{kind:"storage"}]},"CPU")',c),false);
     assert.equal(vm.runInContext('workshopPlanMatchesSubject({durationSeconds:30,instruments:[{kind:"census",intervalMs:10000}]},"GPU")',c),false);
@@ -450,7 +450,7 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     const resource=read("widgets/cpuplus/CpuPlusResourceDiagnosticsPane.qml");
     assert.match(resource,/CpuPlusDiagnosticsPane\s*\{/);
     assert.doesNotMatch(resource,/\b(?:Timer|Process)\s*\{|requestWorkshopCapture\(/);
-    assert.match(read("widgets/CpuPlusW.qml"),/sourceComponent: CpuPlusResourceDiagnosticsPane \{ subject: "CPU" \}/);
+    assert.match(read("widgets/CpuPlusW.qml"),/sourceComponent: CpuPlusResourceDiagnosticsPane \{ subject: cpuResourceDiagnosticsLoader\.resourceSubject \}/);
 }
 
 // D6b host CPU evidence and calibration, distinct from process CPU.
@@ -472,4 +472,28 @@ assert.match(stopwatchDialSource,/externalUnitReadout: true/);
     assert.equal(policy.configuredEvidence("hostcpu",valid,{...cfg,durationSeconds:3}),null);
     for(const invalid of [[a,end],[{...a,aggregate:[100,101,0]},b,end],[a,{...b,cores:[[1,100,30,5,null]]},end],[{...a,psiSomeAvg10:101},b,end],[a,{...b,elapsedMs:1999},end]])
         assert.equal(policy.summarize("hostcpu",jsonl(invalid)),null);
+}
+
+
+// D7a GPU scope, bounded receipts, and independent device coverage.
+{
+    const cfg={kind:"gpu",durationSeconds:2,intervalMs:1000};
+    const a={schema:"post-apollo-gpu-observation-v1",event:"gpu",sequence:1,elapsedMs:1000,intervalMs:1000,devices:[["card0","pci0000:00/0000:01:00.0",40,1048576,2097152,45000],["card1","pci0000:00/0000:02:00.0",null,null,null,null]]};
+    const b={...a,sequence:2,elapsedMs:2000};
+    const end={schema:a.schema,event:"complete",samples:2,observedMs:2000,calibration:cfg};
+    const valid=jsonl([a,b,end]);
+    assert.match(policy.summarize("gpu",valid),/CARD0/);
+    assert.match(policy.summarize("gpu",valid),/CARD1/);
+    assert.match(policy.summarize("gpu",valid),/BUSY \/\/ N\/A/);
+    assert.ok(policy.configuredEvidence("gpu",valid,cfg));
+    assert.equal(policy.configuredEvidence("gpu",valid,{...cfg,durationSeconds:3}),null);
+    for(const invalid of [[a,end],[a,{...b,devices:[b.devices[0]]},end],[{...a,devices:[["card0","pci0000:00/0000:01:00.0",40,3000,2048,null],a.devices[1]]},b,end],[a,{...b,elapsedMs:1999},end],[{...a,devices:[a.devices[1]]},{...b,devices:[b.devices[1]]},end]])
+        assert.equal(policy.summarize("gpu",jsonl(invalid)),null);
+    const c=vm.createContext({});
+    vm.runInContext(read("services/diagnostics/DiagnosticCalibration.js"),c);
+    const p={durationSeconds:2,instruments:[{kind:"gpu",intervalMs:1000}]};
+    assert.equal(vm.runInContext('workshopPlanMatchesSubject('+JSON.stringify(p)+',"GPU")',c),true);
+    assert.equal(vm.runInContext('workshopPlanMatchesSubject('+JSON.stringify(p)+',"CPU")',c),false);
+    assert.equal(vm.runInContext('workshopPlanMatchesSubject('+JSON.stringify(p)+',"ALL")',c),false);
+    assert.equal(vm.runInContext('previewWorkflow({durationSeconds:2,instruments:[{kind:"gpu",intervalMs:1000},{kind:"hostcpu",intervalMs:1000}]}).ok',c),false);
 }

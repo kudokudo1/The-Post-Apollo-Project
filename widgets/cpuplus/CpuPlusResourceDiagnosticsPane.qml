@@ -43,6 +43,7 @@ Item {
             visible: root.informationOpen
             text: root.subject==="CPU"
                 ? "Read-only host CPU capture, same-user process census and Quickshell threads. Host busy is 0–100% of aggregate capacity; process CPU can exceed 100%. Driver frequency and kernel PSI may be unavailable. Host capture runs alone; the report archive and sequential workflow queue are shared."
+                : root.subject==="GPU" ? "All hardware DRM cards are observed independently, regardless of the selected SYSTEM row. Busy, VRAM and uniquely associated hwmon temp1 depend on driver support. No process attribution, stress test or clock changes. Reports and workflow queue are shared."
                 : "No qualified resource-specific instrument."
             color: Colors.white
             font.pixelSize: 10

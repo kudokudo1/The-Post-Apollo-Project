@@ -24,7 +24,7 @@ Scope {
     function selectComparison(side, reportId) {
         if (archiveBusy || archiveStatus !== "READY") return false;
         const row = archiveRows.find(item => item.id === reportId);
-        if (!row || row.status !== "COMPLETE" || ["workflow","stall","hostcpu"].includes(row.kind)) return false;
+        if (!row || row.status !== "COMPLETE" || ["workflow","stall","hostcpu","gpu"].includes(row.kind)) return false;
         if (side === "before") compareBeforeId = row.id;
         else if (side === "after") compareAfterId = row.id;
         else return false;
@@ -125,14 +125,18 @@ Scope {
     property var cpuWorkshopDraft: ({durationSeconds:30, selected:["census"], hostCpuIntervalMs:1000,
         threadIntervalMs:1000, memoryIntervalMs:10000, censusIntervalMs:10000, topCount:4, stallThresholdMs:350,
         storageCadenceExplicit:false, storageSampleSeconds:1, storageReportSeconds:10})
+    property var gpuWorkshopDraft: ({durationSeconds:10, selected:["gpu"], gpuIntervalMs:1000,
+        threadIntervalMs:1000, memoryIntervalMs:10000, censusIntervalMs:10000, topCount:4, stallThresholdMs:350,
+        hostCpuIntervalMs:1000, storageCadenceExplicit:false, storageSampleSeconds:1, storageReportSeconds:10})
     function draftForSubject(subject) {
-        return subject==="CPU" ? cpuWorkshopDraft : workshopDraft;
+        return subject==="CPU" ? cpuWorkshopDraft : subject==="GPU" ? gpuWorkshopDraft : workshopDraft;
     }
     function setDraftForSubject(subject, draft) {
         if (workshopPresetLocked || !draft || !Array.isArray(draft.selected)
-                || !["CPU","ALL"].includes(subject)
+                || !["CPU","GPU","ALL"].includes(subject)
                 || !draft.selected.every(k=>Calibration.workshopSubjectKinds(subject).includes(k))) return false;
         if (subject==="CPU") cpuWorkshopDraft=draft;
+        else if (subject==="GPU") gpuWorkshopDraft=draft;
         else workshopDraft=draft;
         return true;
     }

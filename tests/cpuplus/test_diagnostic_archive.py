@@ -97,6 +97,11 @@ class ArchiveTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             archive.validate_rows([record(1),record(1)])
 
+    def test_gpu_kind(self):
+        row = dict(record(1), kind="gpu")
+        self.save(row)
+        self.assertEqual(self.read()["rows"], [row])
+
     def test_host_cpu_kind(self):
         row = dict(record(1), kind="hostcpu")
         self.save(row)

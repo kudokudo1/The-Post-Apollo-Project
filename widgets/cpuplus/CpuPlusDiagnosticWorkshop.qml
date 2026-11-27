@@ -16,6 +16,7 @@ Column {
     readonly property var filterKinds: Calibration.workshopSubjectKinds(subject)
     readonly property int filterCount: filterKinds.length
     readonly property string targetText: {
+        if (draft.selected.includes("gpu")) return "TARGET // ALL DRM DEVICES";
         if (draft.selected.includes("hostcpu")) return "TARGET // HOST CPU";
         const qs=draft.selected.some(k=>k==="threads"||k==="memory"||k==="stall");
         const system=draft.selected.some(k=>k==="census"||k==="storage");
@@ -62,6 +63,7 @@ Column {
     readonly property bool recording: CpuPlusDiagnostics.busy
         && CpuPlusDiagnostics.captureId === CpuPlusDiagnostics.workshopRunId
         && CpuPlusDiagnostics.workshopRunId !== ""
+        && CpuPlusDiagnostics.workshopRunPlan === planText
     readonly property var terminal: {
         const row=CpuPlusDiagnostics.reports[CpuPlusDiagnostics.workshopRunKind];
         return row && row.id===CpuPlusDiagnostics.workshopRunId
@@ -72,6 +74,7 @@ Column {
         ? Math.max(0,Math.min(0.96,(displayNow-CpuPlusDiagnostics.workshopStartedMs)
             / Math.max(1000,CpuPlusDiagnostics.workshopDurationSeconds*1000))) : 0
     readonly property string phase: recording ? (CpuPlusDiagnostics.cancelled ? "STOPPING" : "RECORDING")
+        : CpuPlusDiagnostics.busy ? "SHARED BUSY"
         : calibrating ? "CALIBRATING" : ready ? "READY"
         : terminal && terminal.status==="COMPLETE" ? "COMPLETE"
         : terminal ? "RETRY" : "PREPARE"
@@ -109,7 +112,7 @@ Column {
     function toggle(kind) {
         if (locked || !filterKinds.includes(kind)) return;
         // Host capture is standalone in D6b; mixed sequential sets remain supported.
-        if (kind==="hostcpu") { edit("selected",draft.selected.includes(kind)?[]:[kind]); return; }
+        if (kind==="hostcpu" || kind==="gpu") { edit("selected",draft.selected.includes(kind)?[]:[kind]); return; }
         const selected=draft.selected.filter(k=>k!=="hostcpu");
         const i=selected.indexOf(kind);
         if (i<0) selected.push(kind); else selected.splice(i,1);
@@ -163,6 +166,7 @@ Column {
                 {kind:"memory",symbol:"",subject:"MEMORY"},
                 {kind:"census",symbol:"",subject:"CPU"},
                 {kind:"hostcpu",symbol:"▥",subject:"CPU"},
+                {kind:"gpu",symbol:"󰢮",subject:"GPU"},
                 {kind:"storage",symbol:"",subject:"STORAGE"},
                 {kind:"stall",symbol:"⚡",subject:"UPTIME"}].filter(row=>root.filterKinds.includes(row.kind))
             ActionButton {
@@ -258,25 +262,25 @@ Column {
         onValueRequested: value=>root.edit("censusIntervalMs",value*1000)
     }
     CpuPlusDiagnosticSlider {
-        objectName: "cpuplusWorkshopHostCpuInterval"
+        objectName: root.subject==="GPU" ? "cpuplusWorkshopGpuInterval" : "cpuplusWorkshopHostCpuInterval"
         width: parent.width
         compact: root.compactLayout
-        subjectColor: Colors.orange
-        fillColor: Colors.orange
-        visible: root.draft.selected.includes("hostcpu")
-        title: "HOST SAMPLE INTERVAL"
-        readout: root.draft.hostCpuIntervalMs/1000+" SEC"
+        subjectColor: root.subject==="GPU" ? Colors.omnitrix : Colors.orange
+        fillColor: subjectColor
+        visible: root.draft.selected.includes("hostcpu") || root.draft.selected.includes("gpu")
+        title: root.subject==="GPU" ? "GPU SAMPLE INTERVAL" : "HOST SAMPLE INTERVAL"
+        readout: currentValue+" SEC"
         minimumValue: 1
         maximumValue: 5
-        currentValue: root.draft.hostCpuIntervalMs/1000
+        currentValue: root.subject==="GPU" ? (root.draft.gpuIntervalMs||1000)/1000 : (root.draft.hostCpuIntervalMs||1000)/1000
         adjustable: !root.locked
-        onValueRequested: value=>root.edit("hostCpuIntervalMs",value*1000)
+        onValueRequested: value=>root.edit(root.subject==="GPU"?"gpuIntervalMs":"hostCpuIntervalMs",value*1000)
     }
     GohuText {
         width: parent.width
-        visible: root.draft.selected.includes("hostcpu")
-        text: "HOST BUSY / LOGICAL CPUs / PSI / SCALING FREQUENCY · 12 SAMPLES MAX"
-        color: Colors.orange
+        visible: root.draft.selected.includes("hostcpu") || root.draft.selected.includes("gpu")
+        text: root.subject==="GPU" ? "BUSY / VRAM / TEMP1 · ALL DRM DEVICES · 12 SAMPLES MAX" : "HOST BUSY / LOGICAL CPUs / PSI / SCALING FREQUENCY · 12 SAMPLES MAX"
+        color: root.subject==="GPU" ? Colors.omnitrix : Colors.orange
         font.pixelSize: 10
         wrapMode: Text.WordWrap
     }
@@ -625,6 +629,7 @@ Column {
         objectName: "cpuplusWorkshopCalibrationStatus"
         width: parent.width
         text: root.recording ? "ELAPSED TIME // NOT COMPLETION"
+            : CpuPlusDiagnostics.busy ? "SHARED CAPTURE ACTIVE // "+CpuPlusDiagnostics.kind.toUpperCase()
             : root.ready ? "SECOND CLICK STARTS CAPTURE"
             : root.preview.ok ? "CALIBRATION VALID // EST. "+(root.plan.instruments.length===1?root.preview.observations:root.preview.estimatedObservations)
             : root.preview.reason

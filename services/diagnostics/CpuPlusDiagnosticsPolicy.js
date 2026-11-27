@@ -21,7 +21,7 @@ function archiveResponse(doc, submitted) {
 }
 
 function validKind(kind) {
-    return ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall", "hostcpu"].indexOf(kind) >= 0;
+    return ["memory", "inventory", "threads", "census", "storage", "appcontrol", "workflow", "stall", "hostcpu", "gpu"].indexOf(kind) >= 0;
 }
 
 function reportLimit(kind) { return kind === "workflow" ? 300000 : 65536; }
@@ -36,7 +36,7 @@ function noticeFor(job, report) {
             || ["COMPLETE", "CANCELLED", "NOT VERIFIED"].indexOf(report.status) < 0)
         return null;
     const labels = {memory: "MEMORY OBSERVE", inventory: "SOURCE WORKLOAD SCAN",
-                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE", appcontrol: "APPCONTROL TEST", workflow: "DIAGNOSTIC WORKFLOW", stall: "UI STALL OBSERVE", hostcpu: "HOST CPU OBSERVE"};
+                    threads: "THREAD SAMPLE", census: "PROCESS CENSUS", storage: "STORAGE OBSERVE", appcontrol: "APPCONTROL TEST", workflow: "DIAGNOSTIC WORKFLOW", stall: "UI STALL OBSERVE", hostcpu: "HOST CPU OBSERVE", gpu: "GPU OBSERVE"};
     return {
         id: "apollo-cpu-diag-" + report.id,
         source: "CPU++",
@@ -148,6 +148,7 @@ function storageCadence(c) {
 // Observer receipts extend the terminal record rather than prepend a row,
 // keeping existing memory, census and storage projections compatible.
 function configuredEvidence(kind,text,expected) {
+    if (kind==="gpu") { const d=gpuEvidence(text,expected); return d ? d.calibration : null; }
     if (kind==="hostcpu") { const d=hostCpuEvidence(text,expected); return d ? d.calibration : null; }
     if (kind==="threads") return configuredThreadEvidence(text,expected);
     try {
@@ -372,6 +373,7 @@ function appControlMetrics(text) {
     } catch (error) { return null; }
 }
 function summarize(kind, text) {
+    if (kind==="gpu") return gpuSummary(text);
     if (kind==="hostcpu") return hostCpuSummary(text);
     if (kind === "stall") {
         const d=stallEvidence(text,null);
@@ -828,4 +830,67 @@ function hostCpuSummary(text) {
         +"\nSCALING FREQUENCY // "+(frequency.length?Math.min(...frequency).toFixed(0)+"–"+Math.max(...frequency).toFixed(0)+" MHz / "+frequency.length+"/"+last.cores.length+" CPUs":"N/A")
         +"\nTOP LOGICAL CPUs // "+coreStats.slice(0,8).map(a=>"CPU"+a.id+" "+a.busy.toFixed(1)+"%").join(" / ")
         +"\nHost busy excludes idle and iowait, includes steal; 100% = aggregate capacity. PSI is a rolling kernel reading, not capture-local stall time. Scaling frequency is driver-reported, not measured clock. Raw report retains every covered logical CPU.";
+}
+
+
+// Each DRM device has its own identity and coverage. Never add GPU percentages
+// or convert unsupported readings into zero.
+function gpuEvidence(text,expected) {
+    try {
+        if (typeof text!=="string"||text.length>65536||/[^\x00-\x7f]/.test(text)) return null;
+        const records=text.trim().split("\n").map(line=>JSON.parse(line)), end=records.pop();
+        const schema="post-apollo-gpu-observation-v1", integer=(x,min,max)=>Number.isSafeInteger(x)&&x>=min&&x<=max;
+        const c=end&&end.calibration;
+        const keys=(o,k)=>!!o&&Object.keys(o).length===k.length&&k.every(x=>Object.prototype.hasOwnProperty.call(o,x));
+        if (!keys(end,["schema","event","samples","observedMs","calibration"])
+                ||end.schema!==schema||end.event!=="complete"||!keys(c,["kind","durationSeconds","intervalMs"])
+                ||c.kind!=="gpu"||!integer(c.durationSeconds,1,30)
+                ||!integer(c.intervalMs,1000,Math.min(5000,c.durationSeconds*1000))||c.intervalMs%1000
+                ||(expected&&(!keys(expected,Object.keys(c))||Object.keys(c).some(k=>c[k]!==expected[k]))))return null;
+        const n=Math.ceil(c.durationSeconds*1000/c.intervalMs);
+        if(n>12||records.length!==n||end.samples!==n||!integer(end.observedMs,c.durationSeconds*1000,45000))return null;
+        let elapsed=0, identity=null, observed=false;
+        const validDevice=(d,j,all)=>Array.isArray(d)&&d.length===6
+            &&typeof d[0]==="string"&&/^card(?:0|[1-9][0-9]{0,5})$/.test(d[0])
+            &&(j===0||d[0]>all[j-1][0])&&typeof d[1]==="string"&&d[1].length<=256
+            &&/^[A-Za-z0-9_./:+-]+$/.test(d[1])&&!d[1].startsWith("/")
+            &&d[1].split("/").every(p=>p!==""&&p!=="."&&p!=="..")
+            &&(d[2]===null||integer(d[2],0,100))
+            &&((d[3]===null&&d[4]===null)||(integer(d[4],1,Number.MAX_SAFE_INTEGER)&&integer(d[3],0,d[4])))
+            &&(d[5]===null||integer(d[5],-40000,200000));
+        for(let i=0;i<n;i++){
+            const row=records[i];
+            if(!keys(row,["schema","event","sequence","elapsedMs","intervalMs","devices"])
+                    ||row.schema!==schema||row.event!=="gpu"||row.sequence!==i+1
+                    ||!integer(row.elapsedMs,Math.min((i+1)*c.intervalMs,c.durationSeconds*1000),end.observedMs)
+                    ||!integer(row.intervalMs,1,45000)||row.elapsedMs!==elapsed+row.intervalMs
+                    ||!Array.isArray(row.devices)||row.devices.length<1||row.devices.length>8
+                    ||!row.devices.every(validDevice)
+                    ||new Set(row.devices.map(d=>d[1])).size!==row.devices.length)return null;
+            const next=JSON.stringify(row.devices.map(d=>d.slice(0,2)));
+            if(identity!==null&&identity!==next)return null;
+            identity=next;elapsed=row.elapsedMs;
+            observed=observed||row.devices.some(d=>d.slice(2).some(v=>v!==null));
+        }
+        if(!observed||elapsed!==end.observedMs)return null;
+        return {calibration:c,records:records,observedMs:elapsed};
+    }catch(_){return null;}
+}
+function gpuSummary(text) {
+    const d=gpuEvidence(text,null);
+    if(!d)return null;
+    const rows=d.records,last=rows[rows.length-1], n=rows.length;
+    const mib=x=>(x/1048576).toFixed(1);
+    const lines=last.devices.map((dev,i)=>{
+        const samples=rows.map(r=>r.devices[i]), busy=samples.filter(a=>a[2]!==null).map(a=>a[2]),
+            vram=samples.filter(a=>a[3]!==null), temp=samples.filter(a=>a[5]!==null).map(a=>a[5]/1000);
+        const coverage=a=>" ("+a.length+"/"+n+")";
+        return dev[0].toUpperCase()+" // "+dev[1].split("/").pop()
+            +"\nBUSY // "+(busy.length?"mean "+(busy.reduce((a,b)=>a+b,0)/busy.length).toFixed(1)+"% / peak "+Math.max(...busy)+"%"+coverage(busy):"N/A")
+            +"\nVRAM // "+(dev[3]===null?"last N/A":mib(dev[3])+" / "+mib(dev[4])+" MiB last")
+            +(vram.length?" / peak used "+mib(Math.max(...vram.map(a=>a[3])))+" MiB"+coverage(vram):"")
+            +"\nTEMP1 // "+(temp.length?"peak "+Math.max(...temp).toFixed(1)+" C"+coverage(temp):"N/A");
+    });
+    return "GPU // "+n+" observations / "+last.devices.length+" DRM devices / "+d.observedMs+" ms\n"
+        +lines.join("\n\n")+"\nDriver-exposed point readings, not interval utilization or per-process attribution. TEMP1 is a uniquely associated hwmon sensor, not necessarily junction. Unsupported fields are N/A.";
 }

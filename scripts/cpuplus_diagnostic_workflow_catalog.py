@@ -83,6 +83,19 @@ def validate_plan(plan):
             raise ValueError("hardware calibration")
 
 
+DUMP_TARGETS = {"appcontrol","camera","hospital","finance","git","company-network",
+                "tasks","forest","apollo-hub","cpuplus","weather","social","time","notifications","media"}
+
+
+def validate_dump_plan(plan):
+    if (type(plan) is not dict or set(plan) != {"durationSeconds","targets"}
+            or not integer(plan["durationSeconds"],5,120)
+            or type(plan["targets"]) is not list or not 1 <= len(plan["targets"]) <= len(DUMP_TARGETS)
+            or any(type(target) is not str or target not in DUMP_TARGETS for target in plan["targets"])
+            or len(set(plan["targets"])) != len(plan["targets"])):
+        raise ValueError("dump plan")
+
+
 def validate(document):
     if (type(document) is not dict or set(document) != {"schema","nextId","rows"}
             or document["schema"] != SCHEMA or not integer(document["nextId"],1,MAX_ID)
@@ -90,11 +103,12 @@ def validate(document):
         raise ValueError("catalog shape")
     ids, names = set(), set()
     for row in document["rows"]:
-        if type(row) is not dict or row.get("execution") not in ("fixed","configured"):
+        if type(row) is not dict or row.get("execution") not in ("fixed","configured","dump"):
             raise ValueError("row shape")
         fixed = row["execution"] == "fixed"
         fields = {"id","name","favorite","execution", "kind" if fixed else "plan"}
-        explicit = not fixed and "targetId" in row
+        dump = row["execution"] == "dump"
+        explicit = not fixed and not dump and "targetId" in row
         if explicit:
             fields.add("targetId")
         if set(row) != fields:
@@ -114,6 +128,10 @@ def validate(document):
         if fixed:
             if seed not in ("inventory","appcontrol") or row["kind"] != seed:
                 raise ValueError("fixed route")
+        elif dump:
+            if seed:
+                raise ValueError("dump identity")
+            validate_dump_plan(row["plan"])
         else:
             if seed in ("inventory","appcontrol"):
                 raise ValueError("fixed identity")

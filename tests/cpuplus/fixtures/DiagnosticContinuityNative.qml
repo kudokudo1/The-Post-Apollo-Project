@@ -1030,6 +1030,17 @@ ShellRoot {
                 // Restore the original storage cadence for the existing set regression.
                 if(!root.check(CpuPlusDiagnostics.loadWorkshopPreset("CONTROLS SAVE"),"restore original calibration"))return;
                 console.log("CPU_Q4_TARGET_CUSTODY_PASS");
+                root.phase=331;return;
+            }
+            if(root.phase===331 && pane.item){
+                if(!root.check(CpuPlusDiagnostics.setLifecycleSelection(["git","hospital"]) && CpuPlusDiagnostics.setLifecycleDuration(10),"dump draft selection"))return;
+                root.phase=332;return;
+            }
+            if(root.phase===332 && pane.item){
+                // No live lifecycle recorder in this memory-pane fixture: refuse execution.
+                if(!root.check(!CpuPlusDiagnostics.lifecycleAvailable && !CpuPlusDiagnostics.startLifecycleCapture(),"no unmounted dump execution"))return;
+                console.log("CPU_Q5F_DUMP_ADMISSION_PASS");
+                const workshop=root.findItem(pane.item,"cpuplusDiagnosticWorkshop");
                 workshop.edit("selected",["census","storage"]);
                 workshop.edit("durationSeconds",1);
                 workshop.edit("censusIntervalMs",1000);

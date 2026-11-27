@@ -78,6 +78,23 @@ Scope {
         captureSequence+=1;
         return true;
     }
+    function lifecyclePlan() {
+        return {durationSeconds:lifecycleDurationSeconds,targets:lifecycleSelection.slice()};
+    }
+    function saveLifecyclePreset(name,favorite=false) {
+        if(workshopPresetLocked||!workflowStore.ready||!lifecycleAvailable)return false;
+        return editWorkflowCatalog({action:"create-dump",name:name,plan:lifecyclePlan(),favorite:favorite});
+    }
+    function loadLifecyclePreset(id) {
+        if(workshopPresetLocked||!workflowStore.ready||!lifecycleAvailable)return false;
+        const row=workflowStore.rows.find(r=>r.id===id&&r.execution==="dump");
+        if(!row||!Lifecycle.validSelection(row.plan.targets)||!Number.isSafeInteger(row.plan.durationSeconds)||
+            row.plan.durationSeconds<5||row.plan.durationSeconds>120)return false;
+        lifecycleSelection=row.plan.targets.slice();
+        lifecycleDurationSeconds=row.plan.durationSeconds;
+        workshopPresetFeedback="DUMP LOADED // START REQUIRED";
+        return true;
+    }
     function cancelLifecycleCapture() {
         return lifecycleActive && lifecycleRecorder.cancel();
     }
@@ -93,6 +110,7 @@ Scope {
         if (workshopPresetLocked || !workflowStore.ready) return false;
         const row=workflowStore.favorites.find(r=>r.id===id);
         if (!row) return false;
+        if (row.execution==="dump") return loadLifecyclePreset(row.id) && startLifecycleCapture();
         if (row.execution==="fixed") return request(row.kind);
         if (row.execution==="configured") return requestWorkshopCapture(row.plan,row.targetId||"automatic");
         return false;
@@ -293,6 +311,7 @@ Scope {
         if (workshopPresetLocked || !workflowStore.ready) return false;
         const p=workshopPresets.find(x=>x.name===name);
         // Queue custody remains detached calibration snapshots, not catalog IDs.
+        if(p && p.execution==="dump"){setFeedback="DUMP // QUEUE NOT SUPPORTED";return false;}
         if(p && p.targetId){setFeedback="EXPLICIT TARGET // QUEUE NOT SUPPORTED";return false;}
         const next=p && p.execution==="configured" &&
             Calibration.validatedWorkshopSet(workshopQueue.concat([{name:p.name,plan:p.plan}]));

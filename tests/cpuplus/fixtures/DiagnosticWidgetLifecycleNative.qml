@@ -123,6 +123,38 @@ ShellRoot {
                 if(recorder.active)return;
                 if(!root.check(recorder.report.status==="CANCELLED" && !resources.busy,"joint cancel terminal"))return;
                 console.log("CPU_Q5E_JOINT_PASS");
+                if(!root.check(CpuPlusDiagnostics.loadWorkflowCatalog(),"load catalog for dump save"))return;
+                root.phase=6;return;
+            }
+            if(root.phase===6){
+                if(CpuPlusDiagnostics.workflowCatalogBusy)return;
+                if(!root.check(CpuPlusDiagnostics.workflowCatalogReady && CpuPlusDiagnostics.setLifecycleSelection(["git","hospital"]) &&
+                    CpuPlusDiagnostics.setLifecycleDuration(5) && CpuPlusDiagnostics.saveLifecyclePreset("DUMP WITNESS",true) && !recorder.active,"save without capture"))return;
+                root.phase=7;return;
+            }
+            if(root.phase===7){
+                if(CpuPlusDiagnostics.workflowCatalogBusy)return;
+                const row=CpuPlusDiagnostics.workflowFavorites.find(r=>r.name==="DUMP WITNESS");
+                if(!root.check(row && row.execution==="dump" && row.plan.targets.join(",")==="git,hospital" &&
+                    !CpuPlusDiagnostics.queueWorkshop(row.name) && CpuPlusDiagnostics.loadWorkflowCatalog(),"confirmed saved scope, queue refusal"))return;
+                root.phase=8;return;
+            }
+            if(root.phase===8){
+                if(CpuPlusDiagnostics.workflowCatalogBusy)return;
+                const row=CpuPlusDiagnostics.workflowFavorites.find(r=>r.name==="DUMP WITNESS");
+                if(!root.check(row && CpuPlusDiagnostics.setLifecycleSelection(["media"]) &&
+                    CpuPlusDiagnostics.runFavoriteWorkflow(row.id) && recorder.run.ids.join(",")==="git,hospital" && resources.busy,
+                    "disk-reloaded QUICK runs exact saved targets"))return;
+                root.phase=9;return;
+            }
+            if(root.phase===9){
+                if(!root.check(CpuPlusDiagnostics.cancelLifecycleCapture(),"stop saved dump"))return;
+                root.phase=10;return;
+            }
+            if(root.phase===10){
+                if(recorder.active)return;
+                if(!root.check(recorder.report.status==="CANCELLED","saved dump stopped"))return;
+                console.log("CPU_Q5F_SAVED_DUMP_PASS");
                 console.log("CPU_Q5_NATIVE_PASS");Qt.quit();
             }
         }

@@ -1,7 +1,7 @@
 const fs=require("node:fs"),path=require("node:path"),vm=require("node:vm");
 const assert=require("node:assert/strict");
 const context=vm.createContext({assert});
-for(const file of ["DiagnosticWorkflowDefaults.js","DiagnosticCalibration.js","DiagnosticTargetRegistry.js","DiagnosticWorkflowCatalog.js"])
+for(const file of ["DiagnosticWorkflowDefaults.js","DiagnosticCalibration.js","DiagnosticTargetRegistry.js","DiagnosticWidgetLifecycle.js","DiagnosticWorkflowCatalog.js"])
     vm.runInContext(fs.readFileSync(path.join(__dirname,"../../services/diagnostics",file),"utf8"),context);
 function verify(assert, defaults, cal, cat) {
     const seeds=defaults.initialWorkflowFavorites();
@@ -67,3 +67,27 @@ vm.runInContext(`
     assert(!Object.hasOwn(legacy.rows[0],"targetId"));
 `,context);
 console.log("diagnostic target catalog custody PASS");
+
+vm.runInContext(`
+    const dumpSeeds=initialWorkflowFavorites();
+    const dumpCal={workshopDraftFromPlan,workshopPlanFromDraft,dumpSelectionValid:validSelection};
+    const dumpBase=newCatalog(dumpSeeds,dumpCal);
+    const request={action:"create-dump",name:"Post Apollo dump",favorite:true,plan:{durationSeconds:30,targets:lifecycleIds()}};
+    const savedDump=editCatalog(dumpBase,request,dumpSeeds,dumpCal);
+    assert(savedDump.rows[6].execution==="dump"&&savedDump.rows[6].plan.targets.length===15);
+    assert(savedDump.rows[6].plan.targets!==request.plan.targets);
+    const roundDump=validatedCatalog(JSON.parse(JSON.stringify(savedDump)),dumpSeeds,dumpCal);
+    assert(roundDump.rows[6].id==="user-1"&&roundDump.rows[6].favorite);
+    assert(!queueProjection(roundDump.rows[6],dumpCal));
+    assert(!editCatalog(roundDump,{action:"replace",id:"user-1",plan:dumpBase.rows[0].plan},dumpSeeds,dumpCal));
+    assert(editCatalog(roundDump,{action:"favorite",id:"user-1",favorite:false},dumpSeeds,dumpCal).rows[6].favorite===false);
+    for(const targets of [[],["git","git"],["unknown"],[1],Array(1)])
+        assert(!editCatalog(dumpBase,{...request,plan:{durationSeconds:30,targets}},dumpSeeds,dumpCal));
+    for(const durationSeconds of [1,121,"30"])
+        assert(!editCatalog(dumpBase,{...request,plan:{durationSeconds,targets:["git"]}},dumpSeeds,dumpCal));
+    assert(!editCatalog(dumpBase,{...request,plan:{durationSeconds:30,targets:["git"],pid:123}},dumpSeeds,dumpCal));
+    assert(!editCatalog(dumpBase,{...request,targetId:"git"},dumpSeeds,dumpCal));
+    assert(!validatedCatalog({...savedDump,rows:[{...savedDump.rows[6],id:"default-memory"}]},dumpSeeds,dumpCal));
+    assert(!validatedCatalog({...savedDump,rows:[{...savedDump.rows[6],targetId:"git"}]},dumpSeeds,dumpCal));
+`,context);
+console.log("diagnostic dump catalog custody PASS");

@@ -12,6 +12,12 @@ function exactFields(o, fields) {
 function validCatalogName(n) {
     return typeof n==="string" && /^[A-Za-z0-9][A-Za-z0-9 _-]{0,31}$/.test(n) && n.trim()===n;
 }
+function validatedDumpPlan(plan,calibration) {
+    if(!exactFields(plan,["durationSeconds","targets"])||
+        !Number.isSafeInteger(plan.durationSeconds)||plan.durationSeconds<5||plan.durationSeconds>120||
+        typeof calibration.dumpSelectionValid!=="function"||!calibration.dumpSelectionValid(plan.targets))return null;
+    return {durationSeconds:plan.durationSeconds,targets:plan.targets.slice()};
+}
 function validatedCatalog(input, defaults, calibration) {
     try {
         if (!exactFields(input,["schema","nextId","rows"]) || input.schema!==catalogSchema ||
@@ -27,11 +33,12 @@ function validatedCatalog(input, defaults, calibration) {
             const exec=Object.getOwnPropertyDescriptor(row,"execution");
             if(!exec||!Object.prototype.hasOwnProperty.call(exec,"value"))return null;
             const fixed=exec.value==="fixed";
-            const explicit=!fixed&&Object.prototype.hasOwnProperty.call(row,"targetId");
+            const dump=exec.value==="dump";
+            const explicit=!fixed&&!dump&&Object.prototype.hasOwnProperty.call(row,"targetId");
             const fields=["id","name","favorite","execution",fixed?"kind":"plan"];
             if(explicit)fields.push("targetId");
             if(!exactFields(row,fields)||
-                (!fixed&&row.execution!=="configured")||typeof row.id!=="string"||
+                (!fixed&&!dump&&row.execution!=="configured")||typeof row.id!=="string"||
                 !validCatalogName(row.name)||typeof row.favorite!=="boolean")return null;
             const seed=defaults.find(d=>d.id===row.id);
             const match=/^user-([1-9][0-9]*)$/.exec(row.id);
@@ -43,6 +50,11 @@ function validatedCatalog(input, defaults, calibration) {
             if(fixed){
                 if(!seed||seed.execution!=="fixed"||row.kind!==seed.kind)return null;
                 rows.push(Object.assign(core,{kind:row.kind}));
+            }else if(dump){
+                if(seed)return null;
+                const plan=validatedDumpPlan(row.plan,calibration);
+                if(!plan)return null;
+                rows.push(Object.assign(core,{plan:plan}));
             }else{
                 if(seed&&seed.execution!=="configured")return null;
                 const draft=calibration.workshopDraftFromPlan(row.plan);
@@ -68,7 +80,12 @@ function editCatalog(input,edit,defaults,calibration) {
     if(!doc||!edit||Object.getPrototypeOf(edit)!==Object.prototype)return null;
     const kind=Object.getOwnPropertyDescriptor(edit,"action");
     if(!kind||!Object.prototype.hasOwnProperty.call(kind,"value"))return null;
-    if(kind.value==="create"){
+    if(kind.value==="create-dump"){
+        if(!exactFields(edit,["action","name","plan","favorite"])||
+            doc.rows.length>=catalogLimit||doc.nextId>=Number.MAX_SAFE_INTEGER)return null;
+        doc.rows.push({id:"user-"+doc.nextId++,name:edit.name,plan:edit.plan,
+            favorite:edit.favorite,execution:"dump"});
+    }else if(kind.value==="create"){
         const explicit=Object.prototype.hasOwnProperty.call(edit,"targetId");
         const fields=["action","name","plan","favorite"];
         if(explicit)fields.push("targetId");

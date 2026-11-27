@@ -19,6 +19,8 @@ with tempfile.TemporaryDirectory(prefix="cpu-lifecycle-native-") as tmp:
     # synthetic memory rows only (not evidence of real /proc identity).
     scripts=scene/"scripts"
     scripts.mkdir()
+    for name in ("cpuplus_diagnostic_workflow_catalog.py","cpuplus_diagnostic_archive.py","cpuplus_diagnostic_workflow.py","syntagma_quickshell_thread_sampler.py"):
+        shutil.copy2(ROOT/"scripts"/name,scripts/name)
     (scripts/"cpuplus_quickshell_memory_observer.py").write_text("""
 import json,sys,time
 assert sys.argv[1:]==["--workshop","--parent-quickshell","--duration","5","--interval","5"]
@@ -41,7 +43,7 @@ print(json.dumps(dict(event="complete",pid=123,startTicks=456,workshopSchema="po
         env[key]=str(directory)
     env.update(QT_QPA_PLATFORM="offscreen",QT_QUICK_BACKEND="software",QS_DISABLE_FILE_WATCHER="1",WAYLAND_DISPLAY="",DISPLAY="")
     result=subprocess.run(["qs","-p",str(scene/"smoke.qml"),"--no-color"],cwd=scene,env=env,text=True,
-                          stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=25,check=False)
+                          stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=40,check=False)
     print(result.stdout)
-    if result.returncode or "CPU_Q5_NATIVE_PASS" not in result.stdout or "CPU_Q5E_JOINT_PASS" not in result.stdout or "CPU_Q5_NATIVE_FAIL" in result.stdout:
+    if result.returncode or "CPU_Q5_NATIVE_PASS" not in result.stdout or "CPU_Q5E_JOINT_PASS" not in result.stdout or "CPU_Q5F_SAVED_DUMP_PASS" not in result.stdout or "CPU_Q5_NATIVE_FAIL" in result.stdout:
         raise SystemExit("Native lifecycle witness failed")

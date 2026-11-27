@@ -66,7 +66,7 @@ assert.equal(policy.summarize("census",jsonl([{...sample,sequence:2},end])),null
 assert.equal(policy.summarize("census",jsonl([{...sample,rows:[{...censusRow,writeBps:-1}]},end])),null);
 assert.match(policy.summarize("census",jsonl([{...sample,coverage:{truncated:true}},end])), /SCAN LIMIT REACHED/);
 // QUICK labels are supplied by durable catalog rows, not the retired fixed list.
-assert.match(ui,/modelData.name\+\(modelData.execution==="configured"/);
+assert.match(ui,/modelData.name\+\(modelData.execution==="dump"/);
 assert.match(ui,/modelData.kind==="appcontrol"\?" \/\/ 30s"/);
 
 const archived = {kind:"memory",id:"session-abc-def-1",status:"COMPLETE",summary:"summary",text:"raw",finishedAt:"2026-11-24T12:00:00.000Z"};
@@ -105,7 +105,7 @@ assert.deepEqual(JSON.parse(JSON.stringify(policy.argumentsFor("storage",p=>"/lo
 // Storage's fixed adapter remains reachable through the durable QUICK
 // favorites owner; the retired hard-coded button label is not a contract.
 assert.match(owner,/if \(row.execution==="fixed"\) return request\(row.kind\)/);
-assert.match(ui,/modelData.name\+\(modelData.execution==="configured"/);
+assert.match(ui,/modelData.name\+\(modelData.execution==="dump"/);
 assert.match(read("scripts/cpuplus_diagnostic_archive.py"),/KINDS = \{[^}]*"storage"/);
 const comparePolicy=vm.createContext({});
 vm.runInContext(read("services/diagnostics/DiagnosticComparison.js"),comparePolicy);
@@ -847,3 +847,10 @@ assert.match(owner,/lifecycleRecorder.start\(lifecycleSelection,lifecycleDuratio
 assert.match(workshop,/objectName: "cpuplusWorkshopOpenDump"/);
 assert.match(ui,/objectName: "cpuplusLifecycleGlobalStop"/);
 assert.match(read("widgets/cpuplus/CpuPlusLifecycleDumpPopup.qml"),/CpuPlusDiagnostics.startLifecycleCapture\(\)/);
+
+assert.match(owner,/function saveLifecyclePreset\(name,favorite=false\)/);
+assert.match(owner,/row.execution==="dump"\) return loadLifecyclePreset\(row.id\) && startLifecycleCapture\(\)/);
+assert.match(owner,/DUMP \/\/ QUEUE NOT SUPPORTED/);
+assert.match(ui,/POST-APOLLO DUMP \/\/ /);
+assert.match(workshop,/function openLifecycleDump\(\)/);
+assert.match(read("widgets/cpuplus/CpuPlusLifecycleDumpPopup.qml"),/Receipt.sameValue\(r.plan,root.pendingPlan\)/);

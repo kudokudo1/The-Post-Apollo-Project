@@ -1,0 +1,19 @@
+name: CPU++ KILL priority control primitive
+on:
+  pull_request:
+    paths:
+      - 'services/kill/priority_control.py'
+      - 'services/kill/resource_capability_probe.py'
+      - 'tests/cpuplus/test_kill_priority_control.py'
+      - '.github/workflows/cpuplus-kill-priority.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  disposable-priority:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify priority admission and disposable process
+        run: python3 -B tests/cpuplus/test_kill_priority_control.py

@@ -1,20 +1,6 @@
 import QtQuick
 
-// Shared compact information action, extracted from ProcessInformationButton.
-ActionButton {
-    width: 24
-    height: 22
-    label: "i"
-    contentPadding: 2
-    accentColor: Colors.yellow
-    idleForegroundColor: Colors.white
-    hoverForegroundColor: Colors.orange
-    selectedForegroundColor: Colors.magenta
-    idleContentGlowColor: Colors.yellow
-    hoverContentGlowColor: Colors.yellow
-    selectedContentGlowColor: Colors.magenta
-    contentGlowIdleOpacity: 0.85
-    acceptedButtons: Qt.LeftButton
-    keyboardActivationSignal: "leftClicked"
+// Compatibility name: existing contextual information controls now show Joy.
+SoulButton {
     Accessible.name: "Information"
 }

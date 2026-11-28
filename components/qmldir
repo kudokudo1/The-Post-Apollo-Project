@@ -32,6 +32,7 @@ AskSendButton 1.0 AskSendButton.qml
 CloseButton 1.0 CloseButton.qml
 ReloadButton 1.0 ReloadButton.qml
 ResizeButton 1.0 ResizeButton.qml
+ResizeCubeButton 1.0 ResizeCubeButton.qml
 TrashLifecycleActionDeck 1.0 TrashLifecycleActionDeck.qml
 FavoritesToggleButton 1.0 FavoritesToggleButton.qml
 FavoritesUnifiedPreview 1.0 FavoritesUnifiedPreview.qml

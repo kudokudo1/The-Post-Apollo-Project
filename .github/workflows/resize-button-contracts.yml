@@ -8,6 +8,9 @@ on:
     paths:
       - "components/ActionButton.qml"
       - "components/ResizeButton.qml"
+      - "components/ResizeCubeButton.qml"
+      - "assets/resize/**"
+      - "tests/components/test_resize_cube_button_contract.py"
       - "components/qmldir"
       - "components/Colors.qml"
       - "tests/components/test_resize_button_contracts.py"
@@ -18,6 +21,9 @@ on:
     paths:
       - "components/ActionButton.qml"
       - "components/ResizeButton.qml"
+      - "components/ResizeCubeButton.qml"
+      - "assets/resize/**"
+      - "tests/components/test_resize_cube_button_contract.py"
       - "components/qmldir"
       - "components/Colors.qml"
       - "tests/components/test_resize_button_contracts.py"
@@ -36,7 +42,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
       - name: Verify canonical arrows and inherited ActionButton rules
-        run: python3 tests/components/test_resize_button_contracts.py
+        run: |
+          python3 tests/components/test_resize_button_contracts.py
+          python3 tests/components/test_resize_cube_button_contract.py
 
   runtime-smoke:
     name: Offscreen Qt ResizeButton input and glyph glow

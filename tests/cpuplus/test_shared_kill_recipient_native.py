@@ -153,7 +153,15 @@ with tempfile.TemporaryDirectory(prefix="kill-priority-") as tmp:
     config = base / "scene"
     (config / "services/system").mkdir(parents=True)
     shutil.copytree(ROOT / "services/kill", config / "services/kill")
-    shutil.copy2(ROOT / "services/system/TaskSafety.qml", config / "services/system")
+    # The imported kill qmldir also declares KillStore and its other types.
+    # Match the existing standalone fixture's production dependency closure.
+    shutil.copytree(ROOT / "services/favorites", config / "services/favorites")
+    shutil.copytree(ROOT / "components", config / "components")
+    for name in ("ProcessTelemetry.qml", "ProcessPresentationState.qml",
+                 "HunterPresentation.qml", "TaskSafety.qml",
+                 "ProcessControl.qml", "ProcessLimits.qml", "HunterExecutor.qml",
+                 "ProcessPresentationController.qml"):
+        shutil.copy2(ROOT / "services/system" / name, config / "services/system")
     shutil.copy2(ROOT / "tests/cpuplus/fixtures/KillPriorityGatewayNative.qml",
                  config / "priority.qml")
     env = os.environ.copy()

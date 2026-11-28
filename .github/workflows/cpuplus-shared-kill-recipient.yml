@@ -29,6 +29,7 @@ on:
       - 'tests/cpuplus/test_shared_kill_recipient_native.py'
       - 'tests/cpuplus/fixtures/SharedKillRecipientNative.qml'
       - 'tests/cpuplus/fixtures/KillResourceEvidenceNative.qml'
+      - 'tests/cpuplus/fixtures/KillPriorityGatewayNative.qml'
       - '.github/workflows/cpuplus-shared-kill-recipient.yml'
   workflow_dispatch:
 permissions:
@@ -58,7 +59,7 @@ jobs:
             qml6-module-qtquick-layouts qml6-module-qtquick-effects qml6-module-qtquick-shapes \
             qml6-module-qt5compat-graphicaleffects qml6-module-qtqml
       - uses: actions/checkout@v4
-      - name: Exercise isolated CPU++ KILL view and disposable read-only inspection
+      - name: Exercise isolated CPU++ KILL view, inspection and priority gateway
         env:
           POST_APOLLO_CPU_KILL_SMOKE: CI_DISPOSABLE_ONLY
         run: python3 -B tests/cpuplus/test_shared_kill_recipient_native.py

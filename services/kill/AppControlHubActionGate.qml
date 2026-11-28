@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "KillPriorityCustody.js" as Priority
 
 // AppControl-owned bridge. Hub never receives ProcessControl, TaskSafety,
 // ProcessLimits or raw ProcessTelemetry. Only explicit typed requests and
@@ -25,6 +26,130 @@ Scope {
     property int probeExitStatus: -1
     property int limitDispatchSerial: 0
     property int probeExitCode: -1
+
+    // Same shared action gate owns both the baseline and subprocess lifecycle.
+    // No UI admission is enabled until restoration lifetime is qualified.
+    property var priorityRecords: ({})
+    property var priorityRequest: null
+    property int prioritySerial: 0
+    property bool priorityExited: false
+    property bool priorityOutDone: false
+    property bool priorityErrDone: false
+    property bool priorityTimedOut: false
+    property int priorityExitCode: -1
+    property int priorityExitStatus: -1
+    property string priorityOutput: ""
+    property string priorityErrors: ""
+
+    function priorityRecordFor(pid,birth,name) {
+        return priorityRecords[Priority.key(pid,birth,name)] || null;
+    }
+    function priorityEligible(pid,birth,name) {
+        const row=exactRow(pid,birth,name);
+        // Initial lane never permits protected targets, even if unlocked.
+        return !!row && !safetyOwner.requiresDangerUnlock(row)
+            && !bulkBlocked && !limitsOwner.applyLoading && !limitsOwner.queuedRequest;
+    }
+    function capturePriority(pid,birth,name) {
+        if (busy || pending || !priorityEligible(pid,birth,name)) return false;
+        const record=priorityRecordFor(pid,birth,name);
+        if (record && record.state==="unknown") return false;
+        return startPriority({pid:pid,startTicks:birth,comm:name,operation:"capture"});
+    }
+    function preparePriority(pid,birth,name,operation,target) {
+        if (busy || pending || !priorityEligible(pid,birth,name)) return false;
+        const plan=Priority.request(priorityRecordFor(pid,birth,name),operation,target);
+        if (!plan) {
+            feedback="PRIORITY BASELINE OR REVERSIBILITY UNAVAILABLE // REFUSED";
+            return false;
+        }
+        pending=Object.assign({pid:pid,startTicks:birth,name:name,action:"priority"},plan);
+        feedback="REVIEW AND CONFIRM PRIORITY // NOT EXECUTED";
+        return true;
+    }
+    function confirmPriority(req) {
+        if (!priorityEligible(req.pid,req.startTicks,req.name)) {
+            finishRequest("PRIORITY TARGET OR SAFETY STATE CHANGED // REFUSED");
+            return false;
+        }
+        const plan=Priority.request(priorityRecordFor(req.pid,req.startTicks,req.name),req.operation,req.target);
+        if (!plan || plan.original!==req.original || !Priority.equal(plan.expectedSnapshot,req.expectedSnapshot)) {
+            finishRequest("PRIORITY BASELINE CHANGED // REFUSED");
+            return false;
+        }
+        if (!startPriority(Object.assign({pid:req.pid,startTicks:req.startTicks,comm:req.name},plan))) {
+            finishRequest("PRIORITY HELPER UNAVAILABLE // NO ACTION");
+            return false;
+        }
+        return true;
+    }
+    function startPriority(plan) {
+        if (busy || priorityRequest) return false;
+        const url=String(Qt.resolvedUrl("priority_control.py"));
+        if (!url.startsWith("file:///")) return false;
+        let path;
+        try { path=decodeURIComponent(url.slice(7)); } catch(error) { return false; }
+        priorityRequest=Object.assign({},plan,{serial:++prioritySerial});
+        priorityExited=false; priorityOutDone=false; priorityErrDone=false;
+        priorityTimedOut=false; priorityExitCode=-1; priorityExitStatus=-1;
+        priorityOutput=""; priorityErrors="";
+        busy=true;
+        feedback=plan.operation==="capture" ? "PRIORITY // CAPTURING ORIGINAL"
+            : "PRIORITY // VERIFYING KERNEL RESULT";
+        priorityWatchdog.restart();
+        priorityProcess.exec(["/usr/bin/python3","-B",path,"--request",JSON.stringify(priorityRequest)]);
+        return true;
+    }
+    function finishPriority() {
+        if (!priorityRequest || !priorityExited || !priorityOutDone || !priorityErrDone) return;
+        priorityWatchdog.stop();
+        const req=priorityRequest;
+        const k=Priority.key(req.pid,req.startTicks,req.comm);
+        const prior=priorityRecords[k] || null;
+        const valid=!priorityTimedOut && priorityExitCode===0 && priorityExitStatus===0 && !priorityErrors.trim();
+        const record=Priority.consume(prior,req,valid ? priorityOutput : null);
+        priorityRecords=Object.assign({},priorityRecords,{[k]:record});
+        priorityRequest=null;
+        finishRequest(record.state==="unknown" ? "PRIORITY OUTCOME OR OWNERSHIP UNKNOWN // NO RETRY"
+            : record.state==="unavailable" ? "PRIORITY EVIDENCE UNAVAILABLE // REFUSED"
+            : req.operation==="capture" ? "PRIORITY // ORIGINAL OBSERVED"
+            : "PRIORITY // KERNEL READBACK VERIFIED");
+        if (req.operation!=="capture") refreshOwner.restart();
+    }
+    Timer {
+        id: priorityWatchdog
+        interval: 5000
+        repeat: false
+        onTriggered: {
+            gate.priorityTimedOut=true;
+            gate.feedback="PRIORITY TIMEOUT // DRAINING";
+            priorityProcess.running=false;
+            gate.finishPriority();
+        }
+    }
+    Process {
+        id: priorityProcess
+        stdout: StdioCollector {
+            onStreamFinished: {
+                gate.priorityOutput=String(text || "");
+                gate.priorityOutDone=true;
+                gate.finishPriority();
+            }
+        }
+        stderr: StdioCollector {
+            onStreamFinished: {
+                gate.priorityErrors=String(text || "");
+                gate.priorityErrDone=true;
+                gate.finishPriority();
+            }
+        }
+        onExited: function(code,status) {
+            gate.priorityExitCode=code;
+            gate.priorityExitStatus=status;
+            gate.priorityExited=true;
+            gate.finishPriority();
+        }
+    }
 
     function exactRow(pid, startTicks, name) {
         if (!Array.isArray(ownerRows) || !Number.isSafeInteger(pid)
@@ -132,7 +257,7 @@ Scope {
         if (busy) return false;
         if (pending) {
             const row = exactRow(pending.pid,pending.startTicks,pending.name);
-            if (row)
+            if (row && pending.action!=="priority")
                 safetyOwner.relockDangerAction(row,
                     actionLockKind(pending.action));
         }
@@ -146,6 +271,7 @@ Scope {
         const req = pending;
         const row = exactRow(req.pid,req.startTicks,req.name);
         if (!row) { pending=null; feedback="PROCESS CHANGED // REFUSED"; return false; }
+        if (req.action==="priority") return confirmPriority(req);
         const kind = actionLockKind(req.action);
         if (!kind) { pending=null; feedback="UNSUPPORTED ACTION"; return false; }
         if (safetyOwner.requiresDangerUnlock(row)

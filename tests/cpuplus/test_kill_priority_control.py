@@ -18,7 +18,8 @@ class PriorityControlTest(unittest.TestCase):
     def request(self, **overrides):
         return dict(dict(serial=1, pid=123, startTicks=456, comm="child",
                          operation="apply", original=0, expected=0, target=5,
-                         expectedSoft=20), **overrides)
+                         expectedSoft=20, expectedSnapshot=dict(nice=0, soft=20,
+                             hard=20, scheduler=0, uid=1000)), **overrides)
 
     def simulated(self, snapshots, req=None, write_error=None):
         with mock.patch.object(p.os, "pidfd_open", return_value=41), \
@@ -47,7 +48,7 @@ class PriorityControlTest(unittest.TestCase):
         self.assertEqual(applied["original"], 0)
         self.assertEqual(writes, [mock.call(os.PRIO_PROCESS, 123, 5)])
         restored, writes = self.simulated([after, after, before],
-            self.request(operation="restore", expected=5, target=0))
+            self.request(operation="restore", expected=5, target=0, expectedSnapshot=after))
         self.assertEqual(restored["state"], "restored")
         self.assertEqual(writes, [mock.call(os.PRIO_PROCESS, 123, 0)])
 
@@ -61,6 +62,7 @@ class PriorityControlTest(unittest.TestCase):
             ([before, drift], self.request()),
             ([before], self.request(operation="restore", target=5)),
             ([before], self.request(expectedSoft=21)),
+            ([before], self.request(expectedSnapshot=dict(before, uid=1001))),
         ]:
             with self.subTest(req=req, snapshots=snapshots):
                 reply, writes = self.simulated(snapshots, req)
@@ -81,7 +83,7 @@ class PriorityControlTest(unittest.TestCase):
             self.assertEqual(p.execute(self.request(operation="bad"))["state"], "refused")
             openfd.assert_not_called()
         before = dict(nice=0, soft=0, hard=0, scheduler=0, uid=1000)
-        reply, writes = self.simulated([before], self.request(target=0, expectedSoft=0))
+        reply, writes = self.simulated([before], self.request(target=0, expectedSoft=0, expectedSnapshot=before))
         self.assertEqual(reply["state"], "unchanged")
         self.assertEqual(writes, [])
 
@@ -109,7 +111,7 @@ class PriorityControlTest(unittest.TestCase):
             self.assertEqual(invoke(dict(req, startTicks=born+1))["state"], "refused")
             soft = captured["before"]["soft"]
             apply = dict(req, operation="apply", original=initial, expected=initial,
-                         target=initial, expectedSoft=soft)
+                         target=initial, expectedSoft=soft, expectedSnapshot=captured["before"])
             self.assertEqual(invoke(apply)["state"], "unchanged")
             candidate = next((n for n in (initial+1, initial-1)
                               if p.reversible_range(initial, initial, n, soft)), None)
@@ -117,7 +119,8 @@ class PriorityControlTest(unittest.TestCase):
                 applied = invoke(dict(apply, target=candidate))
                 self.assertEqual(applied["state"], "applied", applied)
                 self.assertEqual(os.getpriority(os.PRIO_PROCESS, child.pid), candidate)
-                restored = invoke(dict(apply, operation="restore", expected=candidate))
+                restored = invoke(dict(apply, operation="restore", expected=candidate,
+                                       expectedSnapshot=applied["after"]))
                 self.assertEqual(restored["state"], "restored", restored)
                 print("KILL_PRIORITY_REAL_ROUNDTRIP")
             else:

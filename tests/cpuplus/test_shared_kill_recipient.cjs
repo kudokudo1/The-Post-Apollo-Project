@@ -1451,3 +1451,45 @@ test("K8e2a detail sample preserves nice and sparse mask with identity guard",()
     assert.equal(unknown.cpuMask,"");
     assert.equal(parse("4321 100 2048 100000 100 4 1000 98766 1000 3 0 0 0"),null);
 });
+
+test("K9a2: priority owner captures exact baseline, refuses drift and quarantines uncertainty", () => {
+    const source=read("services/kill/KillPriorityCustody.js");
+    const api=new Function(source+"\nreturn {key,request,consume};")();
+    const before={nice:0,soft:20,hard:20,scheduler:0,uid:1000};
+    const after={...before,nice:5};
+    const capture={serial:1,pid:123,startTicks:456,comm:"child",operation:"capture"};
+    const envelope=(req,extra)=>JSON.stringify({schema:"post-apollo-kill-priority-v1",
+        serial:req.serial,pid:req.pid,startTicks:req.startTicks,comm:req.comm,
+        operation:req.operation,...extra});
+    const observed=api.consume(null,capture,envelope(capture,{state:"observed",attempted:false,before}));
+    assert.equal(observed.state,"observed");
+    assert.equal(observed.original,0);
+    assert.equal(api.request(observed,"apply",-1),null);
+    assert.equal(api.request(observed,"apply",0),null);
+    assert.equal(api.request(observed,"restore",0),null);
+    const apply={...capture,serial:2,...api.request(observed,"apply",5)};
+    const applied=envelope(apply,{state:"applied",attempted:true,before,after,original:0});
+    const owned=api.consume(observed,apply,applied);
+    assert.equal(owned.state,"managed");
+    assert.equal(owned.original,0);
+    assert.equal(owned.current.nice,5);
+    assert.deepEqual(api.consume(owned,capture,envelope(capture,{state:"observed",attempted:false,before:after})),owned);
+    assert.equal(api.consume(owned,capture,envelope(capture,{state:"observed",attempted:false,before})).state,"unknown");
+    assert.equal(api.consume(observed,apply,envelope({...apply,serial:3},{state:"applied",attempted:true,before,after,original:0})).state,"unknown");
+    assert.equal(api.consume(observed,apply,null).state,"unknown");
+    const quarantined=api.consume(owned,apply,null);
+    assert.equal(quarantined.original,0);
+    assert.equal(api.request(quarantined,"restore",0),null);
+    assert.deepEqual(api.consume(quarantined,capture,envelope(capture,{state:"observed",attempted:false,before:after})),quarantined);
+    assert.equal(api.consume(observed,apply,envelope(apply,{state:"refused",attempted:false})).state,"unavailable");
+    const restore={...capture,serial:3,...api.request(owned,"restore",0)};
+    const restored=api.consume(owned,restore,envelope(restore,{state:"restored",attempted:true,before:after,after:before,original:0}));
+    assert.deepEqual(restored,observed);
+    assert.equal(api.request({...observed,current:{...before,soft:0}},"apply",5),null);
+    assert.notEqual(api.key(123,456,"child"),api.key(123,457,"child"));
+    assert.match(gate,/if \(req.action==="priority"\) return confirmPriority\(req\)/);
+    assert.match(gate,/!safetyOwner.requiresDangerUnlock\(row\)/);
+    assert.match(gate,/if \(busy \|\| pending \|\| !priorityEligible/);
+    assert.match(gate,/!priorityExited \|\| !priorityOutDone \|\| !priorityErrDone/);
+    assert.match(gate,/priorityProcess.exec\(\["\/usr\/bin\/python3","-B",path/);
+});

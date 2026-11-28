@@ -22,6 +22,7 @@ NeonScrollPaneV2 1.0 NeonScrollPaneV2.qml
 DockButton 1.0 DockButton.qml
 ActionButton 1.0 ActionButton.qml
 InformationButton 1.0 InformationButton.qml
+SoulButton 1.0 SoulButton.qml
 PrismButton 1.0 PrismButton.qml
 PrismBorderGlow 1.0 PrismBorderGlow.qml
 PrismTextGlow 1.0 PrismTextGlow.qml

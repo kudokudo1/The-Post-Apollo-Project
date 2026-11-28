@@ -97,7 +97,11 @@ assert "wrapMode: Text.WrapAnywhere" in source
 assert 'flickable: statusScroll' in source
 assert 'visible: statusBox.detail && scrollable' in source
 assert "statusScroll.width - (statusBox.detail ? 20 : 0)" in source
-assert "detail: !!root.lifecycleService.lastError" in source
+# Queue detail has its own scoped errors; ordinary lifecycle detail is retained.
+assert 'detail: root.mode === "queue"' in source
+assert 'root.queueLifecycleCurrent && !!root.queueLifecycleService.lastError' in source
+assert 'root.queueScopeCurrent && !!root.queueProvider.lastError' in source
+assert ': !!root.lifecycleService.lastError' in source
 assert "root.lifecycleService.lastError ? Colors.red" in source
 assert 'PR CLOSED // REOPEN TO REVIEW' in source
 assert 'PR MERGED // READ-ONLY LIFECYCLE' in source

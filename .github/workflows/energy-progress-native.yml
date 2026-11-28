@@ -4,6 +4,7 @@ on:
     paths:
       - 'components/EnergyProgress*'
       - 'components/qmldir'
+      - 'widgets/GitHubPullRequestControlView.qml'
       - 'tests/fixtures/EnergyProgress*'
       - 'tests/components/energy-progress-motion.test.cjs'
       - '.github/workflows/energy-progress-native.yml'
@@ -61,3 +62,16 @@ jobs:
           grep -F 'DEBUG qml: ENERGY_LOAD_PASS' /tmp/energy-load.log
           test "$(grep -c 'DEBUG qml: ENERGY_LOAD_SAMPLE ' /tmp/energy-load.log)" -eq 5
           if grep -E 'ENERGY_LOAD_FAIL|ReferenceError:|TypeError:|SyntaxError:|Binding loop detected|Failed to load configuration' /tmp/energy-load.log; then exit 1; fi
+      - name: Native queue layout and action custody
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d -t queue-native.XXXXXXXX)"
+          trap 'rm -rf -- "$work"' EXIT
+          mkdir -m 700 "$work/home" "$work/run" "$work/data" "$work/cache" "$work/config"
+          export HOME="$work/home" XDG_RUNTIME_DIR="$work/run" XDG_DATA_HOME="$work/data"
+          export XDG_CACHE_HOME="$work/cache" XDG_CONFIG_HOME="$work/config"
+          export QT_QPA_PLATFORM=xcb QT_QUICK_BACKEND=software QT_LOGGING_RULES=qml.debug=true
+          timeout --kill-after=3s 30s xvfb-run -a bash scripts/components/run_energy_progress_lab.sh queue 2>&1 | tee /tmp/queue-native.log
+          grep -F 'QUEUE_NATIVE_PASS' /tmp/queue-native.log
+          if grep -E 'QUEUE_NATIVE_FAIL|ReferenceError:|TypeError:|SyntaxError:|Binding loop detected|Failed to load configuration' /tmp/queue-native.log; then exit 1; fi

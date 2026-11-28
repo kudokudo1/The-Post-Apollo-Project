@@ -53,10 +53,70 @@ Rectangle {
     readonly property bool hasTarget:
         repositorySlug.trim().length > 0
         && pullRequestNumber > 0
-    readonly property var queueEntry:
-        queueProvider && hasTarget
-        ? queueProvider.entryForPullRequest(pullRequestNumber)
-        : null
+    readonly property string queueTargetKey: repositorySlug + "|" + pullRequestNumber
+        + "|" + pullRequestBaseRef + "|" + pullRequestHeadSha
+    property string activeQueueAction: ""
+    property string completedQueueAction: ""
+    property bool completedQueueSuccess: false
+    property string activeQueueTarget: ""
+    property string queueLifecycleTarget: ""
+    readonly property bool queueLifecycleCurrent: queueLifecycleTarget === queueTargetKey
+    readonly property bool queueScopeCurrent: !!queueProvider && hasTarget
+        && queueProvider.repositorySlug === repositorySlug
+        && queueProvider.branchName === pullRequestBaseRef
+    readonly property bool queueReadCurrent: queueScopeCurrent && !queueProvider.busy
+        && !queueProvider.lastError && queueProvider.status !== "READY"
+    readonly property bool queueUsable: queueReadCurrent && queueProvider.queueAvailable
+    readonly property var queueEntry: queueUsable
+        ? queueProvider.entryForPullRequest(pullRequestNumber) : null
+    readonly property var currentQueuePreview: {
+        const p = queueLifecycleService ? queueLifecycleService.preview || {} : {};
+        return p.repository === repositorySlug && Number(p.number) === pullRequestNumber
+            && p.baseBranch === pullRequestBaseRef
+            && String(p.headSha || "").toLowerCase() === pullRequestHeadSha.toLowerCase()
+            ? p : ({});
+    }
+    onQueueTargetKeyChanged: {
+        activeQueueAction = "";
+        completedQueueAction = "";
+        activeQueueTarget = "";
+        clearArm();
+    }
+    function startQueueAction(token, callback) {
+        if (!hasTarget || activeQueueAction !== "")
+            return false;
+        completedQueueAction = "";
+        activeQueueTarget = queueTargetKey;
+        if (token !== "queue-refresh") queueLifecycleTarget = queueTargetKey;
+        activeQueueAction = token;
+        const accepted = callback();
+        if (!accepted && activeQueueAction === token)
+            finishQueueAction(token, false);
+        return accepted;
+    }
+    function finishQueueAction(token, succeeded) {
+        if (activeQueueAction !== token || activeQueueTarget !== queueTargetKey)
+            return;
+        completedQueueSuccess = succeeded;
+        completedQueueAction = token;
+        activeQueueAction = "";
+        activeQueueTarget = "";
+    }
+    readonly property string queueEmptyText: {
+        if (!queueScopeCurrent)
+            return "QUEUE NOT READ // REFRESH TO READ THE TARGET BRANCH";
+        if (queueProvider.busy)
+            return "READING QUEUE // WAITING FOR GITHUB";
+        if (queueProvider.lastError)
+            return "QUEUE READ FAILED // REFRESH TO RETRY";
+        if (!queueReadCurrent)
+            return "QUEUE NOT READ // REFRESH TO READ THE TARGET BRANCH";
+        if (!queueProvider.queueAvailable)
+            return "NO MERGE QUEUE CONFIGURED // GitHub has no native merge queue for this branch. Ordinary PR merge remains in CONTROL.";
+        if (queueProvider.totalCount === 0)
+            return "QUEUE EMPTY // No pull requests are waiting to merge.";
+        return "QUEUE ENTRIES NOT RETURNED // Refresh to inspect the available entries.";
+    }
     readonly property var selectedThread:
         threadProvider
         && selectedThreadIndex >= 0
@@ -193,8 +253,27 @@ Rectangle {
     }
 
     Connections {
+        target: root.queueProvider
+        ignoreUnknownSignals: true
+        function onRefreshed() {
+            if (root.queueScopeCurrent)
+                root.finishQueueAction("queue-refresh", root.queueReadCurrent);
+        }
+    }
+
+    Connections {
         target: root.queueLifecycleService
         ignoreUnknownSignals: true
+
+        function onPreviewReady(preview) {
+            root.finishQueueAction("queue-preview-" + preview.action,
+                root.currentQueuePreview.action === preview.action);
+        }
+
+        function onPreviewFailed(detail) {
+            if (root.activeQueueAction.indexOf("queue-preview-") === 0)
+                root.finishQueueAction(root.activeQueueAction, false);
+        }
 
         function onQueueChanged(repository, number, queued, evidence) {
             if (String(repository || "") !== root.repositorySlug
@@ -215,6 +294,8 @@ Rectangle {
             evidence
         ) {
             root.clearArm();
+            root.finishQueueAction("queue-execute-" + operation,
+                mutationSucceeded && evidenceVerified);
         }
     }
 
@@ -252,6 +333,10 @@ Rectangle {
         property bool enabledAction: true
         property bool selectedAction: false
         property string actionToken: ""
+        property string queueActionToken: ""
+        objectName: queueActionToken
+        readonly property bool queueCompletionMatches: queueActionToken.length > 0
+            && root.completedQueueAction === queueActionToken
         property real loadingProgress: 0.0
         property bool loadingComplete: false
         property string visualPhase: "idle"
@@ -261,8 +346,9 @@ Rectangle {
             && lastPhaseEvidenceAt > 0
             && visualClock - lastPhaseEvidenceAt >= 8000
         readonly property bool loading:
-            actionToken.length > 0
-            && root.activeLifecycleAction === actionToken
+            (actionToken.length > 0
+            && root.activeLifecycleAction === actionToken)
+            || (queueActionToken.length > 0 && root.activeQueueAction === queueActionToken)
 
         signal triggered()
 
@@ -278,13 +364,15 @@ Rectangle {
                 progressReset.stop();
             } else {
                 progressSlow.stop();
-                if (actionToken.length > 0
+                if ((actionToken.length > 0
                         && root.completedLifecycleAction === actionToken
-                        && root.completedLifecycleSuccess) {
+                        && root.completedLifecycleSuccess)
+                        || (queueCompletionMatches && root.completedQueueSuccess)) {
                     loadingComplete = true;
                     progressFinish.restart();
-                } else if (actionToken.length > 0
-                        && root.completedLifecycleAction === actionToken) {
+                } else if ((actionToken.length > 0
+                        && root.completedLifecycleAction === actionToken)
+                        || queueCompletionMatches) {
                     loadingComplete = false;
                     visualPhase = "failure";
                     progressReset.restart();
@@ -301,10 +389,11 @@ Rectangle {
         // GitHub CLI stdout is collected at completion; a stage transition
         // is evidence, silence is only "no new evidence", not a failure.
         Connections {
-            target: root.lifecycleService
+            target: button.queueActionToken.length > 0
+                ? root.queueLifecycleService : root.lifecycleService
             ignoreUnknownSignals: true
             function onPhaseChanged() {
-                if (button.loading)
+                if (button.loading && button.queueActionToken !== "queue-refresh")
                     button.lastPhaseEvidenceAt = Date.now();
             }
         }
@@ -635,7 +724,10 @@ Rectangle {
         StatusBox {
             id: prActionStatus
             width: parent.width
-            detail: !!root.lifecycleService.lastError
+            detail: root.mode === "queue"
+                ? (root.queueLifecycleCurrent && !!root.queueLifecycleService.lastError)
+                    || (root.queueScopeCurrent && !!root.queueProvider.lastError)
+                : !!root.lifecycleService.lastError
                     || root.lifecycleService.busy
                     || !!root.factsError
             text:
@@ -644,7 +736,17 @@ Rectangle {
                     + root.armedAction.toUpperCase()
                     + " // PRESS AGAIN TO EXECUTE"
                 : root.mode === "queue"
-                ? String(root.queueLifecycleService.status || "QUEUE READY")
+                ? (root.queueLifecycleCurrent && root.queueLifecycleService.lastError
+                    ? String(root.queueLifecycleService.lastError)
+                    : root.queueScopeCurrent && root.queueProvider.lastError
+                    ? String(root.queueProvider.lastError)
+                    : root.queueLifecycleCurrent && (root.queueLifecycleService.busy
+                        || root.completedQueueAction.indexOf("queue-execute-") === 0
+                        || root.completedQueueAction.indexOf("queue-preview-") === 0)
+                    ? String(root.queueLifecycleService.status || "QUEUE READY")
+                    : root.queueScopeCurrent
+                    ? String(root.queueProvider.status || "QUEUE READY")
+                    : "QUEUE // REFRESH TARGET BRANCH")
                 : root.mode === "threads"
                 ? (
                     root.threadLifecycleService.lastError
@@ -1439,282 +1541,250 @@ Rectangle {
     Component {
         id: queuePane
 
-        Column {
-            spacing: 8
+        Item {
+            clip: true
 
-            Row {
-                width: parent.width
-                height: 34
-                spacing: 7
+            // One bounded viewport: controls, preview and entries all scroll
+            // together instead of adding a full-height list below fixed rows.
+            ListView {
+                id: syntagmaPane3
+                objectName: "queueViewport"
+                anchors.fill: parent
+                clip: true
+                spacing: 4
+                boundsBehavior: Flickable.StopAtBounds
+                model: root.queueUsable ? root.queueProvider.entries : []
 
-                ActionButton {
-                    width: 118
-                    label: "REFRESH QUEUE"
-                    accent: Colors.blue
-                    enabledAction:
-                        root.hasTarget
-                        && !root.queueProvider.busy
-                    onTriggered: root.queueProvider.refresh(
-                        root.repositorySlug,
-                        root.pullRequestBaseRef
-                    )
-                }
-
-                ActionButton {
-                    width: 126
-                    label: "PREVIEW ENQUEUE"
-                    accent: Colors.blue
-                    enabledAction:
-                        root.hasTarget
-                        && /^[0-9a-fA-F]{40}$/.test(
-                            root.pullRequestHeadSha
-                           )
-                        && !root.queueLifecycleService.busy
-                    onTriggered: {
-                        root.clearArm();
-                        root.queueLifecycleService.previewEnqueue(
-                            root.repositorySlug,
-                            root.pullRequestNumber,
-                            root.pullRequestHeadSha
-                        );
-                    }
-                }
-
-                ActionButton {
-                    width: 126
-                    label: "PREVIEW DEQUEUE"
-                    accent: Colors.orange
-                    enabledAction:
-                        root.hasTarget
-                        && !root.queueLifecycleService.busy
-                    onTriggered: {
-                        root.clearArm();
-                        root.queueLifecycleService.previewDequeue(
-                            root.repositorySlug,
-                            root.pullRequestNumber
-                        );
-                    }
-                }
-
-                Item { width: 1; height: 1 }
-
-                GohuText {
-                    width: parent.width - 392
-                    anchors.verticalCenter: parent.verticalCenter
-                    horizontalAlignment: Text.AlignRight
-                    text:
-                        root.queueProvider.queueAvailable
-                        ? "QUEUE // "
-                            + String(
-                                root.queueProvider.resolvedBranch
-                                || root.pullRequestBaseRef
-                              )
-                            + " // "
-                            + String(root.queueProvider.totalCount)
-                            + " ENTRIES"
-                        : "QUEUE // NOT CONFIGURED / NOT READ"
-                    font.pixelSize: 9
-                    color: Colors.blue
-                    elide: Text.ElideRight
-                }
-            }
-
-            StatusBox {
-                width: parent.width
-                accent: Colors.blue
-                text:
-                    root.queueEntry
-                    ? "THIS PR // POSITION "
-                        + String(root.queueEntry.position || "?")
-                        + " // "
-                        + String(root.queueEntry.stateLabel || root.queueEntry.state || "")
-                    : "THIS PR // NOT CURRENTLY VISIBLE IN QUEUE"
-            }
-
-            SectionFrame {
-                width: parent.width
-                height: 118
-                fillColor: Colors.black
-                borderWidth: 1
-                borderColor:
-                    root.queueLifecycleService.preview
-                    && root.queueLifecycleService.preview.action
-                    ? Colors.orange
-                    : Colors.blue
-                inset: 8
-
-                Column {
-                    anchors.fill: parent
+                header: Column {
+                    width: Math.max(0, syntagmaPane3.width - 20)
                     spacing: 6
 
-                    GohuText {
-                        text:
-                            root.queueLifecycleService.preview
-                            && root.queueLifecycleService.preview.action
-                            ? "PREVIEW // "
-                                + String(
-                                    root.queueLifecycleService.preview.action
-                                  ).toUpperCase()
-                            : "PREVIEW // NONE"
-                        font.pixelSize: 11
-                        color: Colors.orange
-                    }
-
-                    GohuText {
+                    Flow {
                         width: parent.width
-                        text:
-                            root.queueLifecycleService.preview
-                            && root.queueLifecycleService.preview.pullRequestId
-                            ? "BASE // "
-                                + String(
-                                    root.queueLifecycleService.preview.baseBranch
-                                    || ""
-                                  )
-                                + " // HEAD // "
-                                + String(
-                                    root.queueLifecycleService.preview.headSha
-                                    || ""
-                                  ).slice(0, 12)
-                            : "BUILD A FRESH PREVIEW BEFORE EXECUTION"
-                        font.pixelSize: 9
-                        color: Colors.cyan
-                        elide: Text.ElideRight
-                    }
-
-                    Row {
-                        width: parent.width
-                        height: 30
                         spacing: 7
 
                         ActionButton {
-                            width: 150
-                            label: "EXECUTE ENQUEUE"
-                            accent: Colors.green
-                            enabledAction:
-                                String(
-                                    (root.queueLifecycleService.preview || {}).action
-                                    || ""
-                                ) === "enqueue"
-                                && !root.queueLifecycleService.busy
-                            onTriggered:
-                                root.queueLifecycleService.executeEnqueue()
+                            width: 118
+                            label: "REFRESH QUEUE"
+                            accent: Colors.blue
+                            queueActionToken: "queue-refresh"
+                            enabledAction: root.hasTarget && !root.queueProvider.busy
+                                && root.activeQueueAction === ""
+                            onTriggered: {
+                                root.clearArm();
+                                root.startQueueAction("queue-refresh", function() {
+                                    return root.queueProvider.refresh(root.repositorySlug, root.pullRequestBaseRef);
+                                });
+                            }
                         }
-
                         ActionButton {
-                            width: 150
-                            label:
-                                root.armedAction === "dequeue"
-                                ? "CONFIRM DEQUEUE"
-                                : "EXECUTE DEQUEUE"
-                            selectedAction:
-                                root.armedAction === "dequeue"
-                            accent: Colors.red
-                            enabledAction:
-                                String(
-                                    (root.queueLifecycleService.preview || {}).action
-                                    || ""
-                                ) === "dequeue"
-                                && !root.queueLifecycleService.busy
-                            onTriggered: root.armOrRun(
-                                "dequeue",
-                                function() {
-                                    root.queueLifecycleService.executeDequeue(
-                                        true
-                                    );
-                                }
-                            )
+                            width: 126
+                            label: "PREVIEW ENQUEUE"
+                            accent: Colors.blue
+                            queueActionToken: "queue-preview-enqueue"
+                            enabledAction: root.queueUsable && root.isOpen && !root.pullRequestDraft
+                                && !root.queueEntry && /^[0-9a-fA-F]{40}$/.test(root.pullRequestHeadSha)
+                                && !root.queueLifecycleService.busy && root.activeQueueAction === ""
+                            onTriggered: {
+                                root.clearArm();
+                                root.startQueueAction("queue-preview-enqueue", function() {
+                                    return root.queueLifecycleService.previewEnqueue(
+                                        root.repositorySlug, root.pullRequestNumber, root.pullRequestHeadSha);
+                                });
+                            }
+                        }
+                        ActionButton {
+                            width: 126
+                            label: "PREVIEW DEQUEUE"
+                            accent: Colors.orange
+                            queueActionToken: "queue-preview-dequeue"
+                            enabledAction: root.queueUsable && root.isOpen && !root.pullRequestDraft
+                                && !!root.queueEntry && !root.queueLifecycleService.busy
+                                && root.activeQueueAction === ""
+                            onTriggered: {
+                                root.clearArm();
+                                root.startQueueAction("queue-preview-dequeue", function() {
+                                    return root.queueLifecycleService.previewDequeue(
+                                        root.repositorySlug, root.pullRequestNumber);
+                                });
+                            }
                         }
                     }
-                }
-            }
 
-            Rectangle {
-                width: parent.width
-                height: parent.height - 176
-                color: Colors.dark
-                border.width: 1
-                border.color: Colors.blue
+                    GohuText {
+                        width: parent.width
+                        color: Colors.blue
+                        font.pixelSize: 10
+                        text: "QUEUE // " + (root.pullRequestBaseRef || "UNKNOWN BRANCH")
+                            + (root.queueUsable ? " // " + root.queueProvider.totalCount + " ENTRIES" : "")
+                        wrapMode: Text.WrapAnywhere
+                    }
+                    GohuText {
+                        width: parent.width
+                        color: Colors.blue
+                        font.pixelSize: 10
+                        text: root.queueEntry
+                            ? "THIS PR // POSITION " + String(root.queueEntry.position || "?")
+                                + " // " + String(root.queueEntry.stateLabel || root.queueEntry.state || "")
+                            : root.queueUsable ? "THIS PR // NOT IN QUEUE" : "THIS PR // QUEUE STATUS UNAVAILABLE"
+                        wrapMode: Text.WrapAnywhere
+                    }
 
-                ListView {
-                    id: syntagmaPane3
-                    anchors.fill: parent
-                    anchors.margins: 6
-                    clip: true
-                    spacing: 4
-                    model:
-                        root.queueProvider
-                        ? root.queueProvider.entries
-                        : []
+                    SectionFrame {
+                        width: parent.width
+                        height: queuePreviewColumn.implicitHeight + 16
+                        fillColor: Colors.black
+                        borderWidth: 1
+                        borderColor: root.currentQueuePreview.action ? Colors.orange : Colors.blue
+                        inset: 8
 
-                    delegate: Rectangle {
-                        required property var modelData
-
-                        width: ListView.view.width
-                        height: 48
-                        color: Colors.black
-                        border.width: 1
-                        border.color:
-                            Number(
-                                ((modelData || {}).pullRequest || {}).number
-                                || 0
-                            ) === root.pullRequestNumber
-                            ? Colors.orange
-                            : Colors.blue
-
-                        Row {
+                        Column {
+                            id: queuePreviewColumn
                             anchors.fill: parent
-                            anchors.margins: 7
-                            spacing: 8
+                            spacing: 6
 
                             GohuText {
-                                width: 62
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "#" + String(
-                                    ((modelData || {}).pullRequest || {}).number
-                                    || "?"
-                                )
-                                font.pixelSize: 10
-                                color: Colors.magenta
+                                width: parent.width
+                                text: root.currentQueuePreview.action
+                                    ? "PREVIEW // " + String(root.currentQueuePreview.action).toUpperCase()
+                                    : "PREVIEW // NONE"
+                                font.pixelSize: 11
+                                color: Colors.orange
+                                wrapMode: Text.WrapAnywhere
                             }
-
                             GohuText {
-                                width: parent.width - 210
-                                anchors.verticalCenter: parent.verticalCenter
-                                text:
-                                    String(
-                                        ((modelData || {}).pullRequest || {}).title
-                                        || "UNTITLED"
-                                    )
+                                width: parent.width
+                                text: root.currentQueuePreview.pullRequestId
+                                    ? "BASE // " + String(root.currentQueuePreview.baseBranch || "")
+                                        + " // HEAD // " + String(root.currentQueuePreview.headSha || "").slice(0, 12)
+                                    : "BUILD A FRESH PREVIEW BEFORE EXECUTION"
                                 font.pixelSize: 9
-                                color: Colors.white
-                                elide: Text.ElideRight
+                                color: Colors.cyan
+                                wrapMode: Text.WrapAnywhere
                             }
+                            Flow {
+                                width: parent.width
+                                spacing: 7
 
-                            GohuText {
-                                width: 126
-                                anchors.verticalCenter: parent.verticalCenter
-                                horizontalAlignment: Text.AlignRight
-                                text:
-                                    "POS "
-                                    + String(modelData.position || "?")
-                                    + " // "
-                                    + String(
-                                        modelData.stateLabel
-                                        || modelData.state
-                                        || ""
-                                      )
-                                font.pixelSize: 9
-                                color: Colors.blue
-                                elide: Text.ElideRight
+                                ActionButton {
+                                    width: 150
+                                    label: "EXECUTE ENQUEUE"
+                                    accent: Colors.green
+                                    queueActionToken: "queue-execute-enqueue"
+                                    enabledAction: root.queueUsable && root.isOpen && !root.pullRequestDraft
+                                        && root.currentQueuePreview.action === "enqueue" && !root.queueEntry
+                                        && !root.queueLifecycleService.busy && root.activeQueueAction === ""
+                                    onTriggered: root.startQueueAction("queue-execute-enqueue", function() {
+                                        return root.queueLifecycleService.executeEnqueue();
+                                    })
+                                }
+                                ActionButton {
+                                    width: 150
+                                    label: root.armedAction === "dequeue" ? "CONFIRM DEQUEUE" : "EXECUTE DEQUEUE"
+                                    selectedAction: root.armedAction === "dequeue"
+                                    accent: Colors.red
+                                    queueActionToken: "queue-execute-dequeue"
+                                    enabledAction: root.queueUsable && root.isOpen && !root.pullRequestDraft
+                                        && root.currentQueuePreview.action === "dequeue" && !!root.queueEntry
+                                        && !root.queueLifecycleService.busy && root.activeQueueAction === ""
+                                    onTriggered: root.armOrRun("dequeue", function() {
+                                        root.startQueueAction("queue-execute-dequeue", function() {
+                                            return root.queueLifecycleService.executeDequeue(true);
+                                        });
+                                    })
+                                }
                             }
                         }
                     }
+                    GohuText {
+                        width: parent.width
+                        color: Colors.blue
+                        font.pixelSize: 10
+                        text: "QUEUE ENTRIES"
+                    }
+                    Item { width: 1; height: 2 }
                 }
-                NeonScrollBar {
-                    flickable: syntagmaPane3
-                    handleStyle: "star"
-                    visible: syntagmaPane3.visible && scrollable
+
+                footer: GohuText {
+                    width: Math.max(0, syntagmaPane3.width - 20)
+                    height: syntagmaPane3.count === 0 ? implicitHeight + 12 : 0
+                    visible: syntagmaPane3.count === 0
+                    text: root.queueEmptyText
+                    font.pixelSize: 10
+                    color: Colors.blue
+                    wrapMode: Text.Wrap
+                    verticalAlignment: Text.AlignVCenter
                 }
+
+                delegate: Rectangle {
+                    required property var modelData
+
+                    width: Math.max(0, ListView.view.width - 20)
+                    height: 48
+                    color: Colors.black
+                    border.width: 1
+                    border.color:
+                        Number(
+                            ((modelData || {}).pullRequest || {}).number
+                            || 0
+                        ) === root.pullRequestNumber
+                        ? Colors.orange
+                        : Colors.blue
+
+                    Row {
+                        anchors.fill: parent
+                        anchors.margins: 7
+                        spacing: 8
+
+                        GohuText {
+                            width: 62
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "#" + String(
+                                ((modelData || {}).pullRequest || {}).number
+                                || "?"
+                            )
+                            font.pixelSize: 10
+                            color: Colors.magenta
+                        }
+
+                        GohuText {
+                            width: Math.max(0, parent.width - 210)
+                            anchors.verticalCenter: parent.verticalCenter
+                            text:
+                                String(
+                                    ((modelData || {}).pullRequest || {}).title
+                                    || "UNTITLED"
+                                )
+                            font.pixelSize: 9
+                            color: Colors.white
+                            elide: Text.ElideRight
+                        }
+
+                        GohuText {
+                            width: 126
+                            anchors.verticalCenter: parent.verticalCenter
+                            horizontalAlignment: Text.AlignRight
+                            text:
+                                "POS "
+                                + String(modelData.position || "?")
+                                + " // "
+                                + String(
+                                    modelData.stateLabel
+                                    || modelData.state
+                                    || ""
+                                  )
+                            font.pixelSize: 9
+                            color: Colors.blue
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+
+            }
+            NeonScrollBar {
+                flickable: syntagmaPane3
+                handleStyle: "star"
+                visible: syntagmaPane3.visible && scrollable
             }
         }
     }
